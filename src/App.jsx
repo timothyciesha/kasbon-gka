@@ -1,9 +1,46 @@
 import { useState, useEffect } from "react";
 
+const SUPABASE_URL = "https://qvwohfqpkkqawemchzkk.supabase.co";
+const SUPABASE_KEY = "sb_publishable_zUgWGgPOIKuTC9R9tqEHJg_ImIFftcC";
+
+const headers = {
+  "Content-Type": "application/json",
+  "apikey": SUPABASE_KEY,
+  "Authorization": `Bearer ${SUPABASE_KEY}`,
+};
+
+const db = {
+  async get(table, params = "") {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { headers });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+  async post(table, body) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: "POST", headers: { ...headers, "Prefer": "return=representation" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+  async patch(table, id, body) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: "PATCH", headers: { ...headers, "Prefer": "return=representation" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  },
+  async delete(table, params) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+      method: "DELETE", headers,
+    });
+    if (!res.ok) throw await res.json();
+  },
+};
+
 const ADMIN_FEE = 50000;
 const WAITING_DAYS = 30;
-const STORAGE_KEY = "kasbon_v4";
-
 const fmt = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
 const fmtDate = (iso) => {
   if (!iso) return "-";
@@ -14,22 +51,12 @@ const daysSince = (iso) => {
   return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
 };
 const today = () => new Date().toISOString().slice(0, 10);
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-const DEFAULT_DRIVERS = ["Sahrul", "Ajat", "Deden", "Agus"];
-
-const loadData = () => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  const d = { drivers: DEFAULT_DRIVERS, records: {} };
-  DEFAULT_DRIVERS.forEach((name) => { d.records[name] = { active: null, history: [] }; });
-  return d;
-};
 
 export default function App() {
-  const [data, setData] = useState(loadData);
+  const [drivers, setDrivers] = useState([]);
+  const [kasbons, setKasbons] = useState([]);
+  const [cicilans, setCicilans] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(null);
@@ -42,117 +69,159 @@ export default function App() {
   const [confirmHapus, setConfirmHapus] = useState(null);
   const [showDeleteDriver, setShowDeleteDriver] = useState(false);
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-  }, [data]);
-
   const showToast = (msg, type = "ok") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // helpers
-  const rec = (driver) => data.records[driver] || { active: null, history: [] };
-  const getSisaBayar = (kasbon) => {
-    const paid = (kasbon.cicilan || []).reduce((s, c) => s + c.nominal, 0);
-    return Math.max(0, kasbon.totalPotong - paid);
+  // ── fetch all data ──
+  const fetchAll = async () => {
+    try {
+      const [d, k, c] = await Promise.all([
+        db.get("drivers", "order=created_at.asc"),
+        db.get("kasbons", "order=created_at.asc"),
+        db.get("cicilans", "order=created_at.asc"),
+      ]);
+      setDrivers(d);
+      setKasbons(k);
+      setCicilans(c);
+    } catch (e) {
+      showToast("Gagal load data", "err");
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
-  const getStatus = (driver) => {
-    const d = rec(driver);
-    if (d.active) return "aktif";
-    if (!d.history.length) return "bersih";
-    const last = d.history[d.history.length - 1]?.tanggalLunas;
-    const days = daysSince(last);
+
+  useEffect(() => { fetchAll(); }, []);
+
+  // ── helpers ──
+  const getActive = (driverName) =>
+    kasbons.find(k => k.driver_name === driverName && k.is_active) || null;
+
+  const getHistory = (driverName) =>
+    kasbons.filter(k => k.driver_name === driverName && !k.is_active);
+
+  const getCicilans = (kasbonId) =>
+    cicilans.filter(c => c.kasbon_id === kasbonId);
+
+  const getSisaBayar = (kasbon) => {
+    const paid = getCicilans(kasbon.id).reduce((s, c) => s + c.nominal, 0);
+    return Math.max(0, kasbon.total_potong - paid);
+  };
+
+  const getLastLunas = (driverName) => {
+    const hist = getHistory(driverName);
+    if (!hist.length) return null;
+    return hist[hist.length - 1].tanggal_lunas;
+  };
+
+  const getStatus = (driverName) => {
+    const active = getActive(driverName);
+    if (active) return "aktif";
+    const hist = getHistory(driverName);
+    if (!hist.length) return "bersih";
+    const days = daysSince(getLastLunas(driverName));
     if (days < WAITING_DAYS) return "tunggu";
     return "bisa";
   };
-  const getSisaHari = (driver) => {
-    const last = rec(driver).history.slice(-1)[0]?.tanggalLunas;
+
+  const getSisaHari = (driverName) => {
+    const last = getLastLunas(driverName);
     if (!last) return 0;
     return Math.max(0, WAITING_DAYS - daysSince(last));
   };
-  const getFee = (driver) => {
-    const last = rec(driver).history.slice(-1)[0]?.tanggalLunas;
+
+  const getFee = (driverName) => {
+    const last = getLastLunas(driverName);
     if (!last) return 0;
     return daysSince(last) < WAITING_DAYS ? ADMIN_FEE : 0;
   };
 
-  // actions
-  const addDriver = () => {
+  // ── actions ──
+  const addDriver = async () => {
     const name = newDriverName.trim();
     if (!name) return showToast("Nama tidak boleh kosong", "err");
-    if (data.drivers.includes(name)) return showToast("Nama sudah ada", "err");
-    setData(prev => ({
-      drivers: [...prev.drivers, name],
-      records: { ...prev.records, [name]: { active: null, history: [] } }
-    }));
-    setNewDriverName("");
-    setShowAddDriver(false);
-    showToast(`${name} berhasil ditambahkan`);
+    if (drivers.find(d => d.name === name)) return showToast("Nama sudah ada", "err");
+    try {
+      const [created] = await db.post("drivers", { name });
+      setDrivers(prev => [...prev, created]);
+      setNewDriverName("");
+      setShowAddDriver(false);
+      showToast(`${name} berhasil ditambahkan`);
+    } catch { showToast("Gagal tambah karyawan", "err"); }
   };
 
-  const deleteDriver = (driver) => {
-    if (rec(driver).active) return showToast("Lunaskan kasbon aktif dulu", "err");
-    setData(prev => {
-      const records = { ...prev.records };
-      delete records[driver];
-      return { drivers: prev.drivers.filter(d => d !== driver), records };
-    });
-    setShowDeleteDriver(false);
-    if (sel === driver) { setSel(null); setView("dashboard"); }
-    showToast(`${driver} dihapus`);
+  const deleteDriver = async (driverName) => {
+    if (getActive(driverName)) return showToast("Lunaskan kasbon aktif dulu", "err");
+    try {
+      await db.delete("drivers", `name=eq.${encodeURIComponent(driverName)}`);
+      setDrivers(prev => prev.filter(d => d.name !== driverName));
+      setKasbons(prev => prev.filter(k => k.driver_name !== driverName));
+      setShowDeleteDriver(false);
+      setView("dashboard");
+      showToast(`${driverName} dihapus`);
+    } catch { showToast("Gagal hapus karyawan", "err"); }
   };
 
-  const submitKasbon = () => {
+  const submitKasbon = async () => {
     const nominal = parseInt(kForm.nominal.replace(/\D/g, ""), 10);
     if (!nominal || nominal < 1000) return showToast("Nominal tidak valid", "err");
     const fee = getFee(sel);
-    setData(prev => ({
-      ...prev,
-      records: {
-        ...prev.records,
-        [sel]: { ...rec(sel), active: { nominal, fee, totalPotong: nominal + fee, tanggalKasbon: kForm.tanggal, cicilan: [] } }
-      }
-    }));
-    setKForm({ nominal: "", tanggal: today() });
-    setView("detail");
-    showToast("Kasbon dicatat");
+    try {
+      const [created] = await db.post("kasbons", {
+        driver_name: sel, nominal, fee,
+        total_potong: nominal + fee,
+        tanggal_kasbon: kForm.tanggal,
+        is_active: true,
+      });
+      setKasbons(prev => [...prev, created]);
+      setKForm({ nominal: "", tanggal: today() });
+      setView("detail");
+      showToast("Kasbon dicatat");
+    } catch { showToast("Gagal simpan kasbon", "err"); }
   };
 
-  const submitCicilan = () => {
+  const submitCicilan = async () => {
     const nominal = parseInt(cForm.nominal.replace(/\D/g, ""), 10);
     if (!nominal || nominal < 1) return showToast("Nominal tidak valid", "err");
-    const active = rec(sel).active;
+    const active = getActive(sel);
     const sisa = getSisaBayar(active);
     if (nominal > sisa) return showToast(`Melebihi sisa ${fmt(sisa)}`, "err");
-    const newCicilan = [...(active.cicilan || []), { id: uid(), nominal, tanggal: cForm.tanggal }];
-    const totalBayar = newCicilan.reduce((s, c) => s + c.nominal, 0);
-    const lunas = totalBayar >= active.totalPotong;
-    setData(prev => {
-      const updated = { ...active, cicilan: newCicilan };
+    try {
+      const [created] = await db.post("cicilans", {
+        kasbon_id: active.id, nominal, tanggal: cForm.tanggal,
+      });
+      const newCicilans = [...getCicilans(active.id), created];
+      const totalBayar = newCicilans.reduce((s, c) => s + c.nominal, 0);
+      const lunas = totalBayar >= active.total_potong;
+      setCicilans(prev => [...prev, created]);
       if (lunas) {
-        return { ...prev, records: { ...prev.records, [sel]: { active: null, history: [...rec(sel).history, { ...updated, tanggalLunas: cForm.tanggal }] } } };
+        await db.patch("kasbons", active.id, { is_active: false, tanggal_lunas: cForm.tanggal });
+        setKasbons(prev => prev.map(k => k.id === active.id ? { ...k, is_active: false, tanggal_lunas: cForm.tanggal } : k));
+        showToast("Lunas! 🎉");
+      } else {
+        showToast("Pembayaran dicatat");
       }
-      return { ...prev, records: { ...prev.records, [sel]: { ...rec(sel), active: updated } } };
-    });
-    setCForm({ nominal: "", tanggal: today() });
-    setShowCForm(false);
-    showToast(lunas ? "Lunas! 🎉" : "Pembayaran dicatat");
+      setCForm({ nominal: "", tanggal: today() });
+      setShowCForm(false);
+    } catch { showToast("Gagal simpan cicilan", "err"); }
   };
 
-  const hapusCicilan = (idx) => {
-    const cicilan = [...(rec(sel).active.cicilan || [])];
-    cicilan.splice(idx, 1);
-    setData(prev => ({ ...prev, records: { ...prev.records, [sel]: { ...rec(sel), active: { ...rec(sel).active, cicilan } } } }));
-    setConfirmHapus(null);
-    showToast("Cicilan dihapus");
+  const hapusCicilan = async (cicilanId) => {
+    try {
+      await db.delete("cicilans", `id=eq.${cicilanId}`);
+      setCicilans(prev => prev.filter(c => c.id !== cicilanId));
+      setConfirmHapus(null);
+      showToast("Cicilan dihapus");
+    } catch { showToast("Gagal hapus cicilan", "err"); }
   };
 
   const statusColor = (s) => ({
-    aktif: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-    tunggu: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-    bisa: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-    bersih: "text-slate-400 bg-slate-400/10 border-slate-400/20",
+    aktif: { color: "#fbbf24", bg: "rgba(251,191,36,0.1)", border: "rgba(251,191,36,0.2)" },
+    tunggu: { color: "#60a5fa", bg: "rgba(96,165,250,0.1)", border: "rgba(96,165,250,0.2)" },
+    bisa: { color: "#34d399", bg: "rgba(52,211,153,0.1)", border: "rgba(52,211,153,0.2)" },
+    bersih: { color: "#94a3b8", bg: "rgba(148,163,184,0.1)", border: "rgba(148,163,184,0.2)" },
   }[s]);
 
   const statusLabel = (s, driver) => ({
@@ -162,67 +231,68 @@ export default function App() {
     bersih: "Belum ada",
   }[s]);
 
-  // ═══════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════
+  // LOADING
+  // ════════════════════════════════════════════════════
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: "#0f1117", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: "'Inter', sans-serif" }}>
+      <div style={{ width: 40, height: 40, border: "3px solid #1e293b", borderTop: "3px solid #3b82f6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <p style={{ color: "#475569", fontSize: 14 }}>Memuat data...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════
   // DASHBOARD
-  // ═══════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════
   if (view === "dashboard") {
-    const activeDrivers = data.drivers.filter(d => rec(d).active);
-    const totalSisa = activeDrivers.reduce((s, d) => s + getSisaBayar(rec(d).active), 0);
-    const totalPinjam = activeDrivers.reduce((s, d) => s + rec(d).active.nominal, 0);
+    const activeDrivers = drivers.filter(d => getActive(d.name));
+    const totalSisa = activeDrivers.reduce((s, d) => s + getSisaBayar(getActive(d.name)), 0);
+    const totalPinjam = activeDrivers.reduce((s, d) => s + getActive(d.name).nominal, 0);
 
     return (
-      <div className="min-h-screen" style={{ background: "#0f1117", color: "#e2e8f0", fontFamily: "'Inter', sans-serif" }}>
+      <div style={pageStyle}>
         {toast && <Toast toast={toast} />}
         {showAddDriver && (
           <Modal onClose={() => { setShowAddDriver(false); setNewDriverName(""); }}>
-            <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Tambah Karyawan</p>
-            <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>Nama karyawan baru</p>
-            <input
-              autoFocus
-              type="text"
-              placeholder="Nama lengkap"
-              value={newDriverName}
+            <p style={modalTitle}>Tambah Karyawan</p>
+            <p style={modalSub}>Masukkan nama karyawan baru</p>
+            <input autoFocus type="text" placeholder="Nama lengkap" value={newDriverName}
               onChange={e => setNewDriverName(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addDriver()}
-              style={inputStyle}
-            />
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              style={inputStyle} />
+            <div style={rowStyle}>
               <button onClick={() => { setShowAddDriver(false); setNewDriverName(""); }} style={btnSecondary}>Batal</button>
               <button onClick={addDriver} style={btnPrimary}>Tambah</button>
             </div>
           </Modal>
         )}
 
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 16px 80px" }}>
-          {/* Header */}
-          <div style={{ paddingTop: 48, paddingBottom: 32 }}>
+        <div style={containerStyle}>
+          <div style={{ paddingTop: 48, paddingBottom: 28 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} />
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>GKA Group</span>
                 </div>
                 <h1 style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>GKA Kasbon</h1>
               </div>
-              <button
-                onClick={() => setShowAddDriver(true)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 12, background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-              >
+              <button onClick={() => setShowAddDriver(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 12, background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 <span style={{ fontSize: 16 }}>+</span> Karyawan
               </button>
             </div>
           </div>
 
-          {/* Summary */}
           {activeDrivers.length > 0 && (
-            <div style={{ borderRadius: 20, padding: 20, marginBottom: 20, background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155" }}>
-              <p style={{ color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>Ringkasan Aktif</p>
+            <div style={{ borderRadius: 20, padding: 20, marginBottom: 16, background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155" }}>
+              <p style={eyebrowStyle}>Ringkasan Aktif</p>
               <div style={{ display: "flex", gap: 20 }}>
                 <div style={{ flex: 1 }}>
                   <p style={{ color: "#64748b", fontSize: 12, marginBottom: 4 }}>Total dipinjam</p>
                   <p style={{ color: "#f1f5f9", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>{fmt(totalPinjam)}</p>
                 </div>
-                <div style={{ width: 1, background: "#1e293b" }} />
+                <div style={{ width: 1, background: "#334155" }} />
                 <div style={{ flex: 1 }}>
                   <p style={{ color: "#64748b", fontSize: 12, marginBottom: 4 }}>Belum terbayar</p>
                   <p style={{ color: "#f59e0b", fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>{fmt(totalSisa)}</p>
@@ -231,51 +301,45 @@ export default function App() {
             </div>
           )}
 
-          {/* Driver list */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {data.drivers.length === 0 && (
+            {drivers.length === 0 && (
               <div style={{ textAlign: "center", padding: "48px 0", color: "#334155" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
                 <p style={{ fontSize: 15, fontWeight: 600 }}>Belum ada karyawan</p>
                 <p style={{ fontSize: 13, marginTop: 4 }}>Tap "+ Karyawan" untuk menambahkan</p>
               </div>
             )}
-            {data.drivers.map(driver => {
-              const status = getStatus(driver);
-              const active = rec(driver).active;
+            {drivers.map(driver => {
+              const status = getStatus(driver.name);
+              const sc = statusColor(status);
+              const active = getActive(driver.name);
               const sisa = active ? getSisaBayar(active) : 0;
-              const progress = active ? Math.round(((active.totalPotong - sisa) / active.totalPotong) * 100) : 0;
-
+              const progress = active ? Math.round(((active.total_potong - sisa) / active.total_potong) * 100) : 0;
               return (
-                <button
-                  key={driver}
-                  onClick={() => { setSel(driver); setView("detail"); }}
-                  style={{ background: "#161b27", border: "1px solid #1e293b", borderRadius: 18, padding: 16, textAlign: "left", cursor: "pointer", transition: "border-color 0.15s", width: "100%" }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = "#334155"}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "#1e293b"}
-                >
+                <button key={driver.id} onClick={() => { setSel(driver.name); setView("detail"); }}
+                  style={{ background: "#161b27", border: "1px solid #1e293b", borderRadius: 18, padding: 16, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: active ? 12 : 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontWeight: 800, fontSize: 15 }}>
-                        {driver[0].toUpperCase()}
+                        {driver.name[0].toUpperCase()}
                       </div>
                       <div>
-                        <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{driver}</p>
-                        <p style={{ color: "#475569", fontSize: 12, marginTop: 1 }}>{rec(driver).history.length} kasbon selesai</p>
+                        <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{driver.name}</p>
+                        <p style={{ color: "#475569", fontSize: 12, marginTop: 1 }}>{getHistory(driver.name).length} kasbon selesai</p>
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: "1px solid", ...splitStyle(statusColor(status)) }}>
-                      {statusLabel(status, driver)}
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: `1px solid ${sc.border}`, color: sc.color, background: sc.bg }}>
+                      {statusLabel(status, driver.name)}
                     </span>
                   </div>
                   {active && (
                     <div>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12 }}>
-                        <span style={{ color: "#475569" }}>Terbayar {fmt(active.totalPotong - sisa)}</span>
+                        <span style={{ color: "#475569" }}>Terbayar {fmt(active.total_potong - sisa)}</span>
                         <span style={{ color: "#f59e0b", fontWeight: 700 }}>Sisa {fmt(sisa)}</span>
                       </div>
                       <div style={{ height: 4, background: "#1e293b", borderRadius: 99, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #f59e0b, #fbbf24)", borderRadius: 99, transition: "width 0.4s ease" }} />
+                        <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #f59e0b, #fbbf24)", borderRadius: 99 }} />
                       </div>
                     </div>
                   )}
@@ -284,18 +348,17 @@ export default function App() {
             })}
           </div>
 
-          {/* Rules */}
-          <div style={{ marginTop: 24, background: "#161b27", border: "1px solid #1e293b", borderRadius: 18, padding: 16 }}>
-            <p style={{ color: "#334155", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Aturan Kasbon</p>
+          <div style={{ marginTop: 20, background: "#161b27", border: "1px solid #1e293b", borderRadius: 18, padding: 16 }}>
+            <p style={eyebrowStyle}>Aturan Kasbon</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[
-                { icon: "✅", text: "Kasbon ≥30 hari setelah lunas", sub: "Gratis" },
-                { icon: "⚡", text: "Kasbon <30 hari setelah lunas", sub: "+Rp50.000 admin" },
-                { icon: "🚫", text: "Masih ada kasbon aktif", sub: "Tidak bisa kasbon" },
-              ].map((r, i) => (
+                ["✅", "Kasbon ≥30 hari setelah lunas", "Gratis"],
+                ["⚡", "Kasbon <30 hari setelah lunas", "+Rp50.000 admin"],
+                ["🚫", "Masih ada kasbon aktif", "Tidak bisa kasbon"],
+              ].map(([icon, text, sub], i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: "#475569" }}>{r.icon} {r.text}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>{r.sub}</span>
+                  <span style={{ fontSize: 13, color: "#475569" }}>{icon} {text}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>{sub}</span>
                 </div>
               ))}
             </div>
@@ -305,95 +368,89 @@ export default function App() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════
   // DETAIL
-  // ═══════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════
   if (view === "detail" && sel) {
-    const d = rec(sel);
     const status = getStatus(sel);
-    const active = d.active;
+    const sc = statusColor(status);
+    const active = getActive(sel);
+    const history = getHistory(sel);
     const sisa = active ? getSisaBayar(active) : 0;
-    const totalBayar = active ? active.totalPotong - sisa : 0;
-    const progress = active ? Math.round((totalBayar / active.totalPotong) * 100) : 0;
+    const totalBayar = active ? active.total_potong - sisa : 0;
+    const progress = active ? Math.round((totalBayar / active.total_potong) * 100) : 0;
     const canKasbon = status === "bisa" || status === "bersih";
+    const activeCicilans = active ? getCicilans(active.id) : [];
 
     return (
-      <div className="min-h-screen" style={{ background: "#0f1117", color: "#e2e8f0", fontFamily: "'Inter', sans-serif" }}>
+      <div style={pageStyle}>
         {toast && <Toast toast={toast} />}
 
-        {/* Hapus cicilan confirm */}
         {confirmHapus !== null && (
           <Modal onClose={() => setConfirmHapus(null)}>
-            <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Hapus cicilan?</p>
-            <p style={{ color: "#64748b", fontSize: 13, marginBottom: 20 }}>Tindakan ini tidak bisa dibatalkan.</p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <p style={modalTitle}>Hapus cicilan?</p>
+            <p style={modalSub}>Tindakan ini tidak bisa dibatalkan.</p>
+            <div style={rowStyle}>
               <button onClick={() => setConfirmHapus(null)} style={btnSecondary}>Batal</button>
               <button onClick={() => hapusCicilan(confirmHapus)} style={{ ...btnPrimary, background: "#ef4444" }}>Hapus</button>
             </div>
           </Modal>
         )}
 
-        {/* Delete driver confirm */}
         {showDeleteDriver && (
           <Modal onClose={() => setShowDeleteDriver(false)}>
-            <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Hapus {sel}?</p>
-            <p style={{ color: "#64748b", fontSize: 13, marginBottom: 20 }}>Semua riwayat kasbon akan ikut terhapus.</p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <p style={modalTitle}>Hapus {sel}?</p>
+            <p style={modalSub}>Semua riwayat kasbon akan ikut terhapus permanen.</p>
+            <div style={rowStyle}>
               <button onClick={() => setShowDeleteDriver(false)} style={btnSecondary}>Batal</button>
               <button onClick={() => deleteDriver(sel)} style={{ ...btnPrimary, background: "#ef4444" }}>Hapus</button>
             </div>
           </Modal>
         )}
 
-        {/* Cicilan form sheet */}
         {showCForm && (
           <Modal onClose={() => { setShowCForm(false); setCForm({ nominal: "", tanggal: today() }); }}>
-            <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Catat Pembayaran</p>
-            <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16 }}>Sisa: <strong style={{ color: "#f59e0b" }}>{fmt(sisa)}</strong></p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <p style={modalTitle}>Catat Pembayaran</p>
+            <p style={modalSub}>Sisa: <strong style={{ color: "#f59e0b" }}>{fmt(sisa)}</strong></p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
               <div>
                 <label style={labelStyle}>Nominal Bayar</label>
-                <input autoFocus type="text" inputMode="numeric" placeholder="Contoh: 500000" value={cForm.nominal} onChange={e => setCForm({ ...cForm, nominal: e.target.value })} style={inputStyle} />
-                {parseInt(cForm.nominal.replace(/\D/g,""),10) > 0 && <p style={{ color: "#475569", fontSize: 12, marginTop: 4 }}>{fmt(parseInt(cForm.nominal.replace(/\D/g,""),10))}</p>}
+                <input autoFocus type="text" inputMode="numeric" placeholder="Contoh: 500000"
+                  value={cForm.nominal} onChange={e => setCForm({ ...cForm, nominal: e.target.value })}
+                  style={inputStyle} />
+                {parseInt(cForm.nominal.replace(/\D/g,""),10) > 0 &&
+                  <p style={{ color: "#475569", fontSize: 12, marginTop: 4 }}>{fmt(parseInt(cForm.nominal.replace(/\D/g,""),10))}</p>}
               </div>
               <div>
                 <label style={labelStyle}>Tanggal Bayar</label>
                 <input type="date" value={cForm.tanggal} onChange={e => setCForm({ ...cForm, tanggal: e.target.value })} style={inputStyle} />
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <div style={rowStyle}>
               <button onClick={() => { setShowCForm(false); setCForm({ nominal: "", tanggal: today() }); }} style={btnSecondary}>Batal</button>
               <button onClick={submitCicilan} style={btnPrimary}>Simpan</button>
             </div>
           </Modal>
         )}
 
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 16px 80px" }}>
-          {/* Header */}
+        <div style={containerStyle}>
           <div style={{ paddingTop: 40, paddingBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button onClick={() => { setView("dashboard"); setShowCForm(false); }} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8", fontSize: 18 }}>←</button>
+              <button onClick={() => { setView("dashboard"); setShowCForm(false); }} style={backBtn}>←</button>
               <div>
                 <h2 style={{ color: "#f1f5f9", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>{sel}</h2>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid", ...splitStyle(statusColor(status)) }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: `1px solid ${sc.border}`, color: sc.color, background: sc.bg }}>
                   {statusLabel(status, sel)}
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => setShowDeleteDriver(true)}
-              style={{ background: "transparent", border: "1px solid #1e293b", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#334155", fontSize: 16 }}
-              title="Hapus karyawan"
-            >🗑</button>
+            <button onClick={() => setShowDeleteDriver(true)} style={{ ...backBtn, color: "#475569" }} title="Hapus karyawan">🗑</button>
           </div>
 
-          {/* Active kasbon */}
           {active && (
-            <div style={{ background: "#161b27", border: "1px solid #1e293b", borderRadius: 20, padding: 18, marginBottom: 12 }}>
-              <p style={{ color: "#334155", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Kasbon Aktif</p>
-
-              {/* Progress */}
-              <div style={{ marginBottom: 18 }}>
+            <div style={cardStyle}>
+              <p style={eyebrowStyle}>Kasbon Aktif</p>
+              <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
                   <span style={{ color: "#475569" }}>Terbayar <strong style={{ color: "#94a3b8" }}>{fmt(totalBayar)}</strong></span>
                   <span style={{ color: "#f59e0b", fontWeight: 700 }}>Sisa {fmt(sisa)}</span>
@@ -403,41 +460,38 @@ export default function App() {
                 </div>
                 <p style={{ textAlign: "right", fontSize: 11, color: "#334155", marginTop: 4 }}>{progress}% terbayar</p>
               </div>
-
-              {/* Info */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
                 <InfoRow label="Nominal kasbon" val={fmt(active.nominal)} />
                 {active.fee > 0 && <InfoRow label="Biaya admin" val={`+ ${fmt(active.fee)}`} accent="#ef4444" />}
                 <div style={{ height: 1, background: "#1e293b" }} />
-                <InfoRow label="Total harus bayar" val={fmt(active.totalPotong)} bold />
-                <InfoRow label="Tanggal kasbon" val={fmtDate(active.tanggalKasbon)} />
+                <InfoRow label="Total harus bayar" val={fmt(active.total_potong)} bold />
+                <InfoRow label="Tanggal kasbon" val={fmtDate(active.tanggal_kasbon)} />
               </div>
 
-              {/* Cicilan list */}
-              {active.cicilan && active.cicilan.length > 0 && (
+              {activeCicilans.length > 0 && (
                 <div style={{ marginBottom: 14 }}>
-                  <p style={{ color: "#334155", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Rincian Pembayaran</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {active.cicilan.map((c, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0f1117", borderRadius: 12, padding: "10px 14px" }}>
+                  <p style={eyebrowStyle}>Rincian Pembayaran</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                    {activeCicilans.map((c, i) => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0f1117", borderRadius: 12, padding: "10px 14px" }}>
                         <div>
                           <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14 }}>{fmt(c.nominal)}</p>
                           <p style={{ color: "#475569", fontSize: 12 }}>{fmtDate(c.tanggal)}</p>
                         </div>
-                        <button onClick={() => setConfirmHapus(i)} style={{ background: "transparent", border: "none", color: "#334155", cursor: "pointer", fontSize: 20, padding: "0 4px" }}>×</button>
+                        <button onClick={() => setConfirmHapus(c.id)} style={{ background: "transparent", border: "none", color: "#334155", cursor: "pointer", fontSize: 20, padding: "0 4px" }}>×</button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <button onClick={() => { setCForm({ nominal: "", tanggal: today() }); setShowCForm(true); }} style={{ ...btnPrimary, width: "100%", justifyContent: "center" }}>
+              <button onClick={() => { setCForm({ nominal: "", tanggal: today() }); setShowCForm(true); }}
+                style={{ ...btnPrimary, width: "100%", justifyContent: "center" }}>
                 + Catat Pembayaran
               </button>
             </div>
           )}
 
-          {/* New kasbon */}
           {!active && (
             <div style={{ marginBottom: 12 }}>
               {canKasbon && (
@@ -450,7 +504,7 @@ export default function App() {
                 <div style={{ background: "#0d1a2e", border: "1px solid #1e3a5f", borderRadius: 18, padding: 16 }}>
                   <p style={{ color: "#60a5fa", fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Masa tunggu: {getSisaHari(sel)} hari lagi</p>
                   <p style={{ color: "#3b82f6", fontSize: 13, marginBottom: 12 }}>atau kasbon sekarang dengan biaya admin Rp50.000</p>
-                  <button onClick={() => setView("form")} style={{ background: "#1d4ed8", border: "none", borderRadius: 12, padding: "10px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  <button onClick={() => setView("form")} style={{ background: "#1d4ed8", border: "none", borderRadius: 12, padding: "10px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                     Kasbon Sekarang (+Rp50.000)
                   </button>
                 </div>
@@ -458,15 +512,14 @@ export default function App() {
             </div>
           )}
 
-          {/* History */}
-          <div style={{ background: "#161b27", border: "1px solid #1e293b", borderRadius: 20, overflow: "hidden" }}>
-            <p style={{ color: "#334155", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "16px 18px 10px" }}>
-              Riwayat ({d.history.length})
-            </p>
-            {d.history.length === 0 ? (
+          <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+            <p style={{ ...eyebrowStyle, padding: "16px 18px 10px" }}>Riwayat ({history.length})</p>
+            {history.length === 0 ? (
               <p style={{ color: "#334155", fontSize: 14, padding: "0 18px 18px" }}>Belum ada riwayat.</p>
             ) : (
-              [...d.history].reverse().map((h, i) => <HistoryItem key={i} h={h} fmt={fmt} fmtDate={fmtDate} />)
+              [...history].reverse().map(h => (
+                <HistoryItem key={h.id} h={h} cicilans={getCicilans(h.id)} fmt={fmt} fmtDate={fmtDate} />
+              ))
             )}
           </div>
         </div>
@@ -474,20 +527,20 @@ export default function App() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════
   // FORM KASBON BARU
-  // ═══════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════
   if (view === "form" && sel) {
     const fee = getFee(sel);
     const nominal = parseInt(kForm.nominal.replace(/\D/g, ""), 10) || 0;
     const total = nominal + fee;
 
     return (
-      <div className="min-h-screen" style={{ background: "#0f1117", color: "#e2e8f0", fontFamily: "'Inter', sans-serif" }}>
+      <div style={pageStyle}>
         {toast && <Toast toast={toast} />}
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 16px 80px" }}>
+        <div style={containerStyle}>
           <div style={{ paddingTop: 40, paddingBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={() => setView("detail")} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8", fontSize: 18 }}>←</button>
+            <button onClick={() => setView("detail")} style={backBtn}>←</button>
             <div>
               <h2 style={{ color: "#f1f5f9", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>Kasbon Baru</h2>
               <p style={{ color: "#475569", fontSize: 13 }}>{sel}</p>
@@ -500,17 +553,18 @@ export default function App() {
             </div>
           )}
 
-          <div style={{ background: "#161b27", border: "1px solid #1e293b", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label style={labelStyle}>Nominal Kasbon</label>
-              <input type="text" inputMode="numeric" placeholder="Contoh: 500000" value={kForm.nominal} onChange={e => setKForm({ ...kForm, nominal: e.target.value })} style={{ ...inputStyle, fontSize: 24, fontWeight: 800 }} />
+              <input type="text" inputMode="numeric" placeholder="Contoh: 500000"
+                value={kForm.nominal} onChange={e => setKForm({ ...kForm, nominal: e.target.value })}
+                style={{ ...inputStyle, fontSize: 24, fontWeight: 800 }} />
               {nominal > 0 && <p style={{ color: "#475569", fontSize: 13, marginTop: 4 }}>{fmt(nominal)}</p>}
             </div>
             <div>
               <label style={labelStyle}>Tanggal Kasbon</label>
               <input type="date" value={kForm.tanggal} onChange={e => setKForm({ ...kForm, tanggal: e.target.value })} style={inputStyle} />
             </div>
-
             {nominal > 0 && (
               <div style={{ background: "#0f1117", borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                 <InfoRow label="Nominal" val={fmt(nominal)} />
@@ -519,7 +573,6 @@ export default function App() {
                 <InfoRow label="Total potong gaji" val={fmt(total)} bold />
               </div>
             )}
-
             <button onClick={submitKasbon} style={{ ...btnPrimary, width: "100%", justifyContent: "center", padding: "14px", borderRadius: 14, fontSize: 15 }}>
               Simpan Kasbon
             </button>
@@ -532,35 +585,19 @@ export default function App() {
   return null;
 }
 
-// ── helpers & sub-components ─────────────────────────────
-
-const splitStyle = (cls) => {
-  // parse tailwind-like string into inline style
-  const colorMap = {
-    "text-amber-400": { color: "#fbbf24" },
-    "bg-amber-400/10": { backgroundColor: "rgba(251,191,36,0.1)" },
-    "border-amber-400/20": { borderColor: "rgba(251,191,36,0.2)" },
-    "text-blue-400": { color: "#60a5fa" },
-    "bg-blue-400/10": { backgroundColor: "rgba(96,165,250,0.1)" },
-    "border-blue-400/20": { borderColor: "rgba(96,165,250,0.2)" },
-    "text-emerald-400": { color: "#34d399" },
-    "bg-emerald-400/10": { backgroundColor: "rgba(52,211,153,0.1)" },
-    "border-emerald-400/20": { borderColor: "rgba(52,211,153,0.2)" },
-    "text-slate-400": { color: "#94a3b8" },
-    "bg-slate-400/10": { backgroundColor: "rgba(148,163,184,0.1)" },
-    "border-slate-400/20": { borderColor: "rgba(148,163,184,0.2)" },
-  };
-  return Object.assign({}, ...cls.split(" ").map(c => colorMap[c] || {}));
-};
-
-const inputStyle = {
-  width: "100%", background: "#0f1117", border: "1px solid #1e293b", borderRadius: 12,
-  padding: "12px 14px", color: "#f1f5f9", fontSize: 15, fontFamily: "inherit",
-  outline: "none", boxSizing: "border-box",
-};
+// ── shared styles ─────────────────────────────────────
+const pageStyle = { minHeight: "100vh", background: "#0f1117", color: "#e2e8f0", fontFamily: "'Inter', sans-serif" };
+const containerStyle = { maxWidth: 420, margin: "0 auto", padding: "0 16px 80px" };
+const cardStyle = { background: "#161b27", border: "1px solid #1e293b", borderRadius: 20, padding: 18, marginBottom: 12 };
+const eyebrowStyle = { color: "#334155", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 };
 const labelStyle = { display: "block", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 };
-const btnPrimary = { background: "#3b82f6", border: "none", borderRadius: 12, padding: "12px 20px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" };
+const inputStyle = { width: "100%", background: "#0f1117", border: "1px solid #1e293b", borderRadius: 12, padding: "12px 14px", color: "#f1f5f9", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+const btnPrimary = { background: "#3b82f6", border: "none", borderRadius: 12, padding: "12px 20px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", flex: 1, justifyContent: "center" };
 const btnSecondary = { flex: 1, background: "transparent", border: "1px solid #1e293b", borderRadius: 12, padding: "12px 20px", color: "#64748b", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
+const backBtn = { background: "#1e293b", border: "1px solid #334155", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#94a3b8", fontSize: 18, fontFamily: "inherit" };
+const rowStyle = { display: "flex", gap: 8, marginTop: 16 };
+const modalTitle = { color: "#f1f5f9", fontWeight: 700, fontSize: 17, marginBottom: 4 };
+const modalSub = { color: "#64748b", fontSize: 13, marginBottom: 16 };
 
 function InfoRow({ label, val, bold, accent }) {
   return (
@@ -571,16 +608,14 @@ function InfoRow({ label, val, bold, accent }) {
   );
 }
 
-function HistoryItem({ h, fmt, fmtDate }) {
+function HistoryItem({ h, cicilans, fmt, fmtDate }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ borderTop: "1px solid #1e293b" }}>
-      <button onClick={() => setOpen(!open)} style={{ width: "100%", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
+      <button onClick={() => setOpen(!open)} style={{ width: "100%", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
         <div>
           <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 14 }}>{fmt(h.nominal)}</p>
-          <p style={{ color: "#475569", fontSize: 12, marginTop: 2 }}>
-            {fmtDate(h.tanggalKasbon)} → Lunas {fmtDate(h.tanggalLunas)}
-          </p>
+          <p style={{ color: "#475569", fontSize: 12, marginTop: 2 }}>{fmtDate(h.tanggal_kasbon)} → Lunas {fmtDate(h.tanggal_lunas)}</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {h.fee > 0 && <span style={{ fontSize: 11, color: "#ef4444" }}>+admin</span>}
@@ -588,10 +623,10 @@ function HistoryItem({ h, fmt, fmtDate }) {
           <span style={{ color: "#334155", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
         </div>
       </button>
-      {open && h.cicilan && h.cicilan.length > 0 && (
+      {open && (
         <div style={{ padding: "0 18px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
-          {h.cicilan.map((c, j) => (
-            <div key={j} style={{ display: "flex", justifyContent: "space-between", background: "#0f1117", borderRadius: 10, padding: "8px 12px", fontSize: 13 }}>
+          {cicilans.map((c) => (
+            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", background: "#0f1117", borderRadius: 10, padding: "8px 12px", fontSize: 13 }}>
               <span style={{ color: "#475569" }}>{fmtDate(c.tanggal)}</span>
               <span style={{ fontWeight: 700, color: "#94a3b8" }}>{fmt(c.nominal)}</span>
             </div>
@@ -620,7 +655,7 @@ function Modal({ children, onClose }) {
 
 function Toast({ toast }) {
   return (
-    <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 100, padding: "10px 20px", borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", background: toast.type === "err" ? "#ef4444" : "#1e293b", color: toast.type === "err" ? "#fff" : "#f1f5f9", border: `1px solid ${toast.type === "err" ? "#dc2626" : "#334155"}`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", whiteSpace: "nowrap" }}>
+    <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 100, padding: "10px 20px", borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", background: toast.type === "err" ? "#ef4444" : "#1e293b", color: "#f1f5f9", border: `1px solid ${toast.type === "err" ? "#dc2626" : "#334155"}`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", whiteSpace: "nowrap" }}>
       {toast.msg}
     </div>
   );
