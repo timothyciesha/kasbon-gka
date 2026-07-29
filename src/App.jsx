@@ -87,6 +87,7 @@ export default function App() {
   const [showCForm, setShowCForm] = useState(false);
   const [showAddDriver, setShowAddDriver] = useState(false);
   const [newDriverName, setNewDriverName] = useState("");
+  const [newDriverJabatan, setNewDriverJabatan] = useState("");
   const [confirmHapus, setConfirmHapus] = useState(null);
   const [showDeleteDriver, setShowDeleteDriver] = useState(false);
 
@@ -100,6 +101,7 @@ export default function App() {
     periode: today().slice(0, 7),
     gaji_pokok: DEFAULT_GAJI,
     hari_hadir: "",
+    potongan_pinjaman: "",
   });
   const [slipData, setSlipData] = useState(null);
   const slipRef = useRef(null);
@@ -153,9 +155,9 @@ export default function App() {
     if (!name) return showToast("Nama tidak boleh kosong", "err");
     if (drivers.find(d => d.name === name)) return showToast("Nama sudah ada", "err");
     try {
-      const [created] = await db.post("drivers", { name });
+      const [created] = await db.post("drivers", { name, jabatan: newDriverJabatan || "Sopir" });
       setDrivers(prev => [...prev, created]);
-      setNewDriverName(""); setShowAddDriver(false);
+      setNewDriverName(""); setNewDriverJabatan(""); setShowAddDriver(false);
       showToast(`${name} berhasil ditambahkan`);
     } catch { showToast("Gagal tambah karyawan", "err"); }
   };
@@ -239,17 +241,19 @@ export default function App() {
     const gajiPokok = parseInt(String(slipForm.gaji_pokok).replace(/\D/g, ""), 10) || DEFAULT_GAJI;
     const tunjanganHadir = hari * TUNJANGAN_PER_HARI;
     const absenBulan = getAbsenBulan(slipDriver, slipForm.periode);
-    const active = getActive(slipDriver);
-    const potonganKasbon = active ? active.total_potong : 0;
-    const total = gajiPokok + tunjanganHadir - potonganKasbon;
+    const potonganPinjaman = parseInt(String(slipForm.potongan_pinjaman).replace(/\D/g, ""), 10) || 0;
+    const driverData = drivers.find(d => d.name === slipDriver);
+    const jabatan = driverData?.jabatan || "Sopir";
+    const total = gajiPokok + tunjanganHadir - potonganPinjaman;
     setSlipData({
       driver: slipDriver,
+      jabatan,
       periode: slipForm.periode,
       gajiPokok,
       hariHadir: hari,
       tunjanganHadir,
       absenCount: absenBulan.length,
-      potonganKasbon,
+      potonganPinjaman,
       total,
     });
   };
@@ -420,11 +424,26 @@ export default function App() {
       <div style={pageStyle}>
         {toast && <Toast toast={toast} />}
         {showAddDriver && (
-          <Modal onClose={() => { setShowAddDriver(false); setNewDriverName(""); }}>
+          <Modal onClose={() => { setShowAddDriver(false); setNewDriverName(""); setNewDriverJabatan(""); }}>
             <p style={modalTitle}>Tambah Karyawan</p>
-            <p style={modalSub}>Masukkan nama karyawan baru</p>
-            <input autoFocus type="text" placeholder="Nama lengkap" value={newDriverName} onChange={e => setNewDriverName(e.target.value)} onKeyDown={e => e.key === "Enter" && addDriver()} style={inputStyle} />
-            <div style={rowStyle}><button onClick={() => { setShowAddDriver(false); setNewDriverName(""); }} style={btnSecondary}>Batal</button><button onClick={addDriver} style={btnPrimary}>Tambah</button></div>
+            <p style={modalSub}>Isi nama dan jabatan karyawan</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Nama</label>
+                <input autoFocus type="text" placeholder="Nama lengkap" value={newDriverName} onChange={e => setNewDriverName(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Jabatan</label>
+                <select value={newDriverJabatan} onChange={e => setNewDriverJabatan(e.target.value)} style={{ ...inputStyle, appearance: "none" }}>
+                  <option value="">-- Pilih jabatan --</option>
+                  <option value="Sopir">Sopir</option>
+                  <option value="Sales">Sales</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Kolektor">Kolektor</option>
+                </select>
+              </div>
+            </div>
+            <div style={rowStyle}><button onClick={() => { setShowAddDriver(false); setNewDriverName(""); setNewDriverJabatan(""); }} style={btnSecondary}>Batal</button><button onClick={addDriver} style={btnPrimary}>Tambah</button></div>
           </Modal>
         )}
         <div style={containerStyle}>
@@ -620,6 +639,11 @@ export default function App() {
                 return <p style={{ color: "#f59e0b", fontSize: 12, marginTop: 6 }}>⚠ {ab.length}x absen tercatat bulan ini</p>;
               })()}
             </div>
+            <div>
+              <label style={labelStyle}>Potongan Pinjaman</label>
+              <input type="text" inputMode="numeric" placeholder="Kosongkan jika tidak ada" value={slipForm.potongan_pinjaman} onChange={e => { setSlipForm({ ...slipForm, potongan_pinjaman: e.target.value }); setSlipData(null); }} style={inputStyle} />
+              {parseInt(String(slipForm.potongan_pinjaman).replace(/\D/g,""),10) > 0 && <p style={{ color: "#475569", fontSize: 12, marginTop: 4 }}>{fmt(parseInt(String(slipForm.potongan_pinjaman).replace(/\D/g,""),10))}</p>}
+            </div>
             <button onClick={generateSlip} style={{ ...btnPrimary, width: "100%", justifyContent: "center", padding: "14px", borderRadius: 14, fontSize: 15 }}>
               Generate Slip Gaji
             </button>
@@ -648,7 +672,7 @@ export default function App() {
                   <div>
                     <p style={{ color: "#64748b", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Nama Karyawan</p>
                     <p style={{ color: "#0f172a", fontWeight: 800, fontSize: 18 }}>{slipData.driver}</p>
-                    <p style={{ color: "#94a3b8", fontSize: 12 }}>Sopir · GKA Group</p>
+                    <p style={{ color: "#94a3b8", fontSize: 12 }}>{slipData.jabatan} · GKA Group</p>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <p style={{ color: "#64748b", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Kehadiran</p>
@@ -668,11 +692,11 @@ export default function App() {
                 </div>
 
                 {/* Potongan */}
-                {slipData.potonganKasbon > 0 && (
+                {slipData.potonganPinjaman > 0 && (
                   <>
                     <p style={{ color: "#64748b", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>Potongan</p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                      <SlipRow label="Potongan Kasbon" val={`- ${fmt(slipData.potonganKasbon)}`} color="#ef4444" />
+                      <SlipRow label="Potongan Pinjaman" val={`- ${fmt(slipData.potonganPinjaman)}`} color="#ef4444" />
                     </div>
                   </>
                 )}
