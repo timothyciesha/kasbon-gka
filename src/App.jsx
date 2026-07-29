@@ -483,7 +483,7 @@ export default function App() {
           <div style={{ paddingTop: 48, paddingBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}><div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} /><span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>GKA Group</span></div>
-              <h1 style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>GKA Kasbon</h1>
+              <h1 style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>GKA App</h1>
             </div>
             <button onClick={() => setShowAddDriver(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 12, background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}><span style={{ fontSize: 16 }}>+</span> Karyawan</button>
           </div>
@@ -761,7 +761,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <p style={{ color: "#cbd5e1", fontSize: 10, textAlign: "center", marginTop: 20 }}>Dicetak pada {fmtDateLong(today())} · GKA Kasbon App</p>
+                <p style={{ color: "#cbd5e1", fontSize: 10, textAlign: "center", marginTop: 20 }}>Dicetak pada {fmtDateLong(today())} · GKA App</p>
               </div>
             </div>
           )}
