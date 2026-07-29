@@ -90,6 +90,8 @@ export default function App() {
   const [newDriverJabatan, setNewDriverJabatan] = useState("");
   const [confirmHapus, setConfirmHapus] = useState(null);
   const [showDeleteDriver, setShowDeleteDriver] = useState(false);
+  const [showEditJabatan, setShowEditJabatan] = useState(false);
+  const [editJabatanVal, setEditJabatanVal] = useState("Sopir");
 
   // absen
   const [absenForm, setAbsenForm] = useState({ driver_name: "", tanggal: today() });
@@ -174,8 +176,18 @@ export default function App() {
     } catch { showToast("Gagal hapus karyawan", "err"); }
   };
 
+  const saveJabatan = async () => {
+    const driver = drivers.find(d => d.name === sel);
+    if (!driver) return;
+    try {
+      await db.patch("drivers", driver.id, { jabatan: editJabatanVal });
+      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, jabatan: editJabatanVal } : d));
+      setShowEditJabatan(false);
+      showToast("Jabatan diperbarui");
+    } catch { showToast("Gagal update jabatan", "err"); }
+  };
+
   const submitKasbon = async () => {
-    const nominal = parseInt(kForm.nominal.replace(/\D/g, ""), 10);
     if (!nominal || nominal < 1000) return showToast("Nominal tidak valid", "err");
     const fee = getFee(sel);
     try {
@@ -310,6 +322,22 @@ export default function App() {
           {toast && <Toast toast={toast} />}
           {confirmHapus !== null && <Modal onClose={() => setConfirmHapus(null)}><p style={modalTitle}>Hapus cicilan?</p><p style={modalSub}>Tidak bisa dibatalkan.</p><div style={rowStyle}><button onClick={() => setConfirmHapus(null)} style={btnSecondary}>Batal</button><button onClick={() => hapusCicilan(confirmHapus)} style={{ ...btnPrimary, background: "#ef4444" }}>Hapus</button></div></Modal>}
           {showDeleteDriver && <Modal onClose={() => setShowDeleteDriver(false)}><p style={modalTitle}>Hapus {sel}?</p><p style={modalSub}>Semua data akan terhapus permanen.</p><div style={rowStyle}><button onClick={() => setShowDeleteDriver(false)} style={btnSecondary}>Batal</button><button onClick={() => deleteDriver(sel)} style={{ ...btnPrimary, background: "#ef4444" }}>Hapus</button></div></Modal>}
+          {showEditJabatan && (
+            <Modal onClose={() => setShowEditJabatan(false)}>
+              <p style={modalTitle}>Edit Jabatan</p>
+              <p style={modalSub}>{sel}</p>
+              <select value={editJabatanVal} onChange={e => setEditJabatanVal(e.target.value)} style={{ ...inputStyle, appearance: "none", marginBottom: 0 }}>
+                <option value="Sopir">Sopir</option>
+                <option value="Sales">Sales</option>
+                <option value="Admin">Admin</option>
+                <option value="Kolektor">Kolektor</option>
+              </select>
+              <div style={rowStyle}>
+                <button onClick={() => setShowEditJabatan(false)} style={btnSecondary}>Batal</button>
+                <button onClick={saveJabatan} style={btnPrimary}>Simpan</button>
+              </div>
+            </Modal>
+          )}
           {showCForm && (
             <Modal onClose={() => { setShowCForm(false); setCForm({ nominal: "", tanggal: today() }); }}>
               <p style={modalTitle}>Catat Pembayaran</p>
@@ -327,7 +355,12 @@ export default function App() {
                 <button onClick={() => setView("dashboard")} style={backBtn}>←</button>
                 <div>
                   <h2 style={{ color: "#f1f5f9", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>{sel}</h2>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: `1px solid ${sc.border}`, color: sc.color, background: sc.bg }}>{statusLabel(status, sel)}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: `1px solid ${sc.border}`, color: sc.color, background: sc.bg }}>{statusLabel(status, sel)}</span>
+                    <button onClick={() => { setEditJabatanVal(drivers.find(d => d.name === sel)?.jabatan || "Sopir"); setShowEditJabatan(true); }} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: "1px solid #1e293b", color: "#475569", background: "transparent", cursor: "pointer", fontFamily: "inherit" }}>
+                      {drivers.find(d => d.name === sel)?.jabatan || "Sopir"} ✏️
+                    </button>
+                  </div>
                 </div>
               </div>
               <button onClick={() => setShowDeleteDriver(true)} style={{ ...backBtn, color: "#475569" }}>🗑</button>
