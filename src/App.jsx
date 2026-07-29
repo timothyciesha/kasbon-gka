@@ -75,6 +75,7 @@ export default function App() {
   const [kasbons, setKasbons] = useState([]);
   const [cicilans, setCicilans] = useState([]);
   const [absens, setAbsens] = useState([]);
+  const [gajianList, setGajianList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("kasbon"); // kasbon | absen | slip
   const [view, setView] = useState("dashboard");
@@ -98,6 +99,9 @@ export default function App() {
   // absen
   const [absenForm, setAbsenForm] = useState({ driver_name: "", tanggal: today() });
   const [showAbsenForm, setShowAbsenForm] = useState(false);
+  const [showGajianForm, setShowGajianForm] = useState(false);
+  const [gajianTanggal, setGajianTanggal] = useState(today());
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   // slip
   const [slipDriver, setSlipDriver] = useState("");
@@ -117,13 +121,14 @@ export default function App() {
 
   const fetchAll = async () => {
     try {
-      const [d, k, c, a] = await Promise.all([
+      const [d, k, c, a, g] = await Promise.all([
         db.get("drivers", "order=created_at.asc"),
         db.get("kasbons", "order=created_at.asc"),
         db.get("cicilans", "order=created_at.asc"),
         db.get("absens", "order=tanggal.desc"),
+        db.get("gajian", "order=tanggal.desc"),
       ]);
-      setDrivers(d); setKasbons(k); setCicilans(c); setAbsens(a);
+      setDrivers(d); setKasbons(k); setCicilans(c); setAbsens(a); setGajianList(g);
     } catch { showToast("Gagal load data", "err"); }
     finally { setLoading(false); }
   };
@@ -259,6 +264,34 @@ export default function App() {
       setAbsens(prev => prev.filter(a => a.id !== id));
       showToast("Absen dihapus");
     } catch { showToast("Gagal hapus", "err"); }
+  };
+
+  // hitung next gajian: 2 hari sebelum akhir bulan depan
+  const getNextGajian = (lastTanggal) => {
+    const d = new Date(lastTanggal);
+    d.setMonth(d.getMonth() + 1);
+    // akhir bulan
+    const akhir = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    akhir.setDate(akhir.getDate() - 2);
+    return akhir.toISOString().slice(0, 10);
+  };
+
+  const submitGajian = async () => {
+    try {
+      const [created] = await db.post("gajian", { tanggal: gajianTanggal });
+      setGajianList(prev => [created, ...prev]);
+      setShowGajianForm(false);
+      showToast("Tanggal gajian dicatat");
+    } catch { showToast("Gagal simpan gajian", "err"); }
+  };
+
+  const resetAbsen = async () => {
+    try {
+      await db.delete("absens", "id=neq.00000000-0000-0000-0000-000000000000");
+      setAbsens([]);
+      setShowConfirmReset(false);
+      showToast("Absen direset, data lama sudah diarsip ✓");
+    } catch { showToast("Gagal reset absen", "err"); }
   };
 
   const generateSlip = () => {
@@ -567,10 +600,39 @@ export default function App() {
       grouped[bulan].push(a);
     });
     const bulanList = Object.keys(grouped).sort().reverse();
+    const lastGajian = gajianList[0];
+    const nextGajian = lastGajian ? getNextGajian(lastGajian.tanggal) : null;
+    const hariMenujuGajian = nextGajian ? Math.max(0, Math.ceil((new Date(nextGajian) - new Date(today())) / (1000 * 60 * 60 * 24))) : null;
 
     return (
       <div style={pageStyle}>
         {toast && <Toast toast={toast} />}
+
+        {/* Modal catat gajian */}
+        {showGajianForm && (
+          <Modal onClose={() => setShowGajianForm(false)}>
+            <p style={modalTitle}>Catat Gajian</p>
+            <p style={modalSub}>Masukkan tanggal gajian yang baru dilakukan</p>
+            <input type="date" value={gajianTanggal} onChange={e => setGajianTanggal(e.target.value)} style={inputStyle} />
+            <div style={rowStyle}>
+              <button onClick={() => setShowGajianForm(false)} style={btnSecondary}>Batal</button>
+              <button onClick={submitGajian} style={btnPrimary}>Simpan</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Modal konfirmasi reset */}
+        {showConfirmReset && (
+          <Modal onClose={() => setShowConfirmReset(false)}>
+            <p style={modalTitle}>Reset Absensi?</p>
+            <p style={modalSub}>Data absen lama sudah tersimpan di Supabase sebagai arsip. Tampilan akan mulai dari 0 untuk periode baru.</p>
+            <div style={rowStyle}>
+              <button onClick={() => setShowConfirmReset(false)} style={btnSecondary}>Batal</button>
+              <button onClick={resetAbsen} style={{ ...btnPrimary, background: "#ef4444" }}>Reset</button>
+            </div>
+          </Modal>
+        )}
+
         {showAbsenForm && (
           <Modal onClose={() => setShowAbsenForm(false)}>
             <p style={modalTitle}>Catat Absen</p>
@@ -594,6 +656,7 @@ export default function App() {
             </div>
           </Modal>
         )}
+
         <div style={containerStyle}>
           <div style={{ paddingTop: 48, paddingBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
@@ -601,6 +664,31 @@ export default function App() {
               <h1 style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>Absensi</h1>
             </div>
             <button onClick={() => setShowAbsenForm(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 12, background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}><span style={{ fontSize: 16 }}>+</span> Absen</button>
+          </div>
+
+          {/* Gajian info card */}
+          <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155", borderRadius: 20, padding: 18, marginBottom: 12 }}>
+            <p style={eyebrowStyle}>Info Gajian</p>
+            <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: "#64748b", fontSize: 12, marginBottom: 3 }}>Gajian terakhir</p>
+                <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{lastGajian ? fmtDateLong(lastGajian.tanggal) : "Belum ada"}</p>
+              </div>
+              {nextGajian && (
+                <>
+                  <div style={{ width: 1, background: "#334155" }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ color: "#64748b", fontSize: 12, marginBottom: 3 }}>Gajian berikutnya</p>
+                    <p style={{ color: "#34d399", fontWeight: 700, fontSize: 15 }}>{fmtDateLong(nextGajian)}</p>
+                    <p style={{ color: "#475569", fontSize: 12 }}>{hariMenujuGajian === 0 ? "Hari ini! 🎉" : `${hariMenujuGajian} hari lagi`}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setGajianTanggal(today()); setShowGajianForm(true); }} style={{ ...btnSecondary, flex: 1, fontSize: 13, padding: "9px 12px" }}>+ Catat Gajian</button>
+              <button onClick={() => setShowConfirmReset(true)} style={{ ...btnSecondary, flex: 1, fontSize: 13, padding: "9px 12px", color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}>🔄 Reset Absen</button>
+            </div>
           </div>
 
           {/* Rekap per driver bulan ini */}
@@ -611,7 +699,7 @@ export default function App() {
             const perDriver = {};
             absenBulanIni.forEach(a => { perDriver[a.driver_name] = (perDriver[a.driver_name] || 0) + 1; });
             return (
-              <div style={{ ...cardStyle, marginBottom: 16 }}>
+              <div style={{ ...cardStyle, marginBottom: 12 }}>
                 <p style={eyebrowStyle}>Rekap Bulan Ini — {monthName(bulanIni)}</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {drivers.map(d => (
