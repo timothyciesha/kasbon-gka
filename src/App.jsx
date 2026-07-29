@@ -92,6 +92,8 @@ export default function App() {
   const [showDeleteDriver, setShowDeleteDriver] = useState(false);
   const [showEditJabatan, setShowEditJabatan] = useState(false);
   const [editJabatanVal, setEditJabatanVal] = useState("Sopir");
+  const [showEditGaji, setShowEditGaji] = useState(false);
+  const [editGajiVal, setEditGajiVal] = useState("");
 
   // absen
   const [absenForm, setAbsenForm] = useState({ driver_name: "", tanggal: today() });
@@ -187,6 +189,19 @@ export default function App() {
     } catch { showToast("Gagal update jabatan", "err"); }
   };
 
+  const saveGaji = async () => {
+    const nominal = parseInt(String(editGajiVal).replace(/\D/g, ""), 10);
+    if (!nominal || nominal < 1) return showToast("Nominal tidak valid", "err");
+    const driver = drivers.find(d => d.name === sel);
+    if (!driver) return;
+    try {
+      await db.patch("drivers", driver.id, { gaji_pokok: nominal });
+      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, gaji_pokok: nominal } : d));
+      setShowEditGaji(false);
+      showToast("Gaji pokok diperbarui");
+    } catch { showToast("Gagal update gaji", "err"); }
+  };
+
   const submitKasbon = async () => {
     if (!nominal || nominal < 1000) return showToast("Nominal tidak valid", "err");
     const fee = getFee(sel);
@@ -250,24 +265,14 @@ export default function App() {
     if (!slipDriver) return showToast("Pilih karyawan dulu", "err");
     const hari = parseInt(slipForm.hari_hadir, 10);
     if (!hari || hari < 0) return showToast("Masukkan hari hadir", "err");
-    const gajiPokok = parseInt(String(slipForm.gaji_pokok).replace(/\D/g, ""), 10) || DEFAULT_GAJI;
+    const driverData = drivers.find(d => d.name === slipDriver);
+    const jabatan = driverData?.jabatan || "Sopir";
+    const gajiPokok = parseInt(String(slipForm.gaji_pokok).replace(/\D/g, ""), 10) || driverData?.gaji_pokok || DEFAULT_GAJI;
     const tunjanganHadir = hari * TUNJANGAN_PER_HARI;
     const absenBulan = getAbsenBulan(slipDriver, slipForm.periode);
     const potonganPinjaman = parseInt(String(slipForm.potongan_pinjaman).replace(/\D/g, ""), 10) || 0;
-    const driverData = drivers.find(d => d.name === slipDriver);
-    const jabatan = driverData?.jabatan || "Sopir";
     const total = gajiPokok + tunjanganHadir - potonganPinjaman;
-    setSlipData({
-      driver: slipDriver,
-      jabatan,
-      periode: slipForm.periode,
-      gajiPokok,
-      hariHadir: hari,
-      tunjanganHadir,
-      absenCount: absenBulan.length,
-      potonganPinjaman,
-      total,
-    });
+    setSlipData({ driver: slipDriver, jabatan, periode: slipForm.periode, gajiPokok, hariHadir: hari, tunjanganHadir, absenCount: absenBulan.length, potonganPinjaman, total });
   };
 
   // ══════════════════════════════════════════════════════
@@ -338,6 +343,21 @@ export default function App() {
               </div>
             </Modal>
           )}
+          {showEditGaji && (
+            <Modal onClose={() => setShowEditGaji(false)}>
+              <p style={modalTitle}>Edit Gaji Pokok</p>
+              <p style={modalSub}>{sel}</p>
+              <input autoFocus type="text" inputMode="numeric" placeholder="Contoh: 4000000"
+                value={editGajiVal} onChange={e => setEditGajiVal(e.target.value)}
+                style={{ ...inputStyle, fontSize: 20, fontWeight: 800 }} />
+              {parseInt(String(editGajiVal).replace(/\D/g,""),10) > 0 &&
+                <p style={{ color: "#475569", fontSize: 12, marginTop: 6 }}>{fmt(parseInt(String(editGajiVal).replace(/\D/g,""),10))}</p>}
+              <div style={rowStyle}>
+                <button onClick={() => setShowEditGaji(false)} style={btnSecondary}>Batal</button>
+                <button onClick={saveGaji} style={btnPrimary}>Simpan</button>
+              </div>
+            </Modal>
+          )}
           {showCForm && (
             <Modal onClose={() => { setShowCForm(false); setCForm({ nominal: "", tanggal: today() }); }}>
               <p style={modalTitle}>Catat Pembayaran</p>
@@ -361,6 +381,9 @@ export default function App() {
                       {drivers.find(d => d.name === sel)?.jabatan || "Sopir"} ✏️
                     </button>
                   </div>
+                  <button onClick={() => { setEditGajiVal(drivers.find(d => d.name === sel)?.gaji_pokok || DEFAULT_GAJI); setShowEditGaji(true); }} style={{ marginTop: 6, fontSize: 12, fontWeight: 600, color: "#475569", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left" }}>
+                    Gaji pokok: <strong style={{ color: "#94a3b8" }}>{fmt(drivers.find(d => d.name === sel)?.gaji_pokok || DEFAULT_GAJI)}</strong> ✏️
+                  </button>
                 </div>
               </div>
               <button onClick={() => setShowDeleteDriver(true)} style={{ ...backBtn, color: "#475569" }}>🗑</button>
@@ -650,7 +673,13 @@ export default function App() {
           <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={labelStyle}>Karyawan</label>
-              <select value={slipDriver} onChange={e => { setSlipDriver(e.target.value); setSlipData(null); }} style={{ ...inputStyle, appearance: "none" }}>
+              <select value={slipDriver} onChange={e => {
+                const name = e.target.value;
+                const d = drivers.find(dr => dr.name === name);
+                setSlipDriver(name);
+                setSlipForm(prev => ({ ...prev, gaji_pokok: d?.gaji_pokok || DEFAULT_GAJI }));
+                setSlipData(null);
+              }} style={{ ...inputStyle, appearance: "none" }}>
                 <option value="">-- Pilih karyawan --</option>
                 {drivers.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
               </select>
@@ -661,7 +690,8 @@ export default function App() {
             </div>
             <div>
               <label style={labelStyle}>Gaji Pokok</label>
-              <input type="text" inputMode="numeric" placeholder="Default: Rp4.000.000" value={slipForm.gaji_pokok} onChange={e => { setSlipForm({ ...slipForm, gaji_pokok: e.target.value }); setSlipData(null); }} style={inputStyle} />
+              <input type="text" inputMode="numeric" placeholder="Gaji pokok" value={slipForm.gaji_pokok} onChange={e => { setSlipForm({ ...slipForm, gaji_pokok: e.target.value }); setSlipData(null); }} style={inputStyle} />
+              <p style={{ color: "#334155", fontSize: 11, marginTop: 5 }}>Auto-load dari data karyawan · bisa diubah manual</p>
             </div>
             <div>
               <label style={labelStyle}>Hari Hadir</label>
