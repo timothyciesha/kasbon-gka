@@ -103,6 +103,12 @@ export default function App() {
   const [gajianTanggal, setGajianTanggal] = useState(today());
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
+  // gajian calculator
+  const [gajianCalcForm, setGajianCalcForm] = useState({ periode: today().slice(0, 7), hari_minggu: "", tanggal_merah: "" });
+  const [gajianCalcResult, setGajianCalcResult] = useState(null);
+  const [gajianDetailSel, setGajianDetailSel] = useState(null); // selected driver for detail
+  const [potonganOverride, setPotonganOverride] = useState({}); // {driverName: nominal}
+
   // slip
   const [slipDriver, setSlipDriver] = useState("");
   const [slipForm, setSlipForm] = useState({
@@ -269,11 +275,13 @@ export default function App() {
   // hitung next gajian: 2 hari sebelum akhir bulan depan
   const getNextGajian = (lastTanggal) => {
     const d = new Date(lastTanggal);
-    d.setMonth(d.getMonth() + 1);
-    // akhir bulan
-    const akhir = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    akhir.setDate(akhir.getDate() - 2);
-    return akhir.toISOString().slice(0, 10);
+    // maju ke bulan berikutnya
+    const bulanDepan = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    // akhir bulan depan
+    const akhirBulanDepan = new Date(bulanDepan.getFullYear(), bulanDepan.getMonth() + 1, 0);
+    // 2 hari sebelum akhir bulan
+    akhirBulanDepan.setDate(akhirBulanDepan.getDate() - 2);
+    return akhirBulanDepan.toISOString().slice(0, 10);
   };
 
   const submitGajian = async () => {
@@ -292,6 +300,26 @@ export default function App() {
       setShowConfirmReset(false);
       showToast("Absen direset, data lama sudah diarsip ✓");
     } catch { showToast("Gagal reset absen", "err"); }
+  };
+
+  const hitungGajian = () => {
+    if (!gajianCalcForm.periode) return showToast("Pilih periode dulu", "err");
+    const [year, month] = gajianCalcForm.periode.split("-").map(Number);
+    const totalHari = new Date(year, month, 0).getDate();
+    const hariMinggu = parseInt(gajianCalcForm.hari_minggu, 10) || 0;
+    const tanggalMerah = parseInt(gajianCalcForm.tanggal_merah, 10) || 0;
+    const hariKerja = totalHari - hariMinggu - tanggalMerah;
+    if (hariKerja <= 0) return showToast("Hari kerja tidak valid", "err");
+    const results = drivers.map(d => {
+      const absenBulan = getAbsenBulan(d.name, gajianCalcForm.periode);
+      const hariAbsen = absenBulan.length;
+      const hariHadir = Math.max(0, hariKerja - hariAbsen);
+      const gajiPokok = d.gaji_pokok || DEFAULT_GAJI;
+      const tunjanganHadir = hariHadir * TUNJANGAN_PER_HARI;
+      return { driver: d.name, jabatan: d.jabatan || "Sopir", gajiPokok, hariKerja, hariAbsen, hariHadir, tunjanganHadir };
+    });
+    setGajianCalcResult({ periode: gajianCalcForm.periode, totalHari, hariMinggu, tanggalMerah, hariKerja, results });
+    setPotonganOverride({});
   };
 
   const generateSlip = () => {
@@ -327,7 +355,8 @@ export default function App() {
       {[
         { key: "kasbon", icon: "💳", label: "Kasbon" },
         { key: "absen", icon: "📋", label: "Absen" },
-        { key: "slip", icon: "🧾", label: "Slip Gaji" },
+        { key: "gajian", icon: "💰", label: "Gajian" },
+        { key: "slip", icon: "🧾", label: "Slip" },
       ].map(t => (
         <button key={t.key} onClick={() => { setTab(t.key); setView("dashboard"); }}
           style={{ flex: 1, padding: "12px 0 16px", background: "transparent", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
@@ -738,6 +767,127 @@ export default function App() {
               </div>
             </div>
           ))}
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════
+  // TAB: GAJIAN
+  // ══════════════════════════════════════════════════════
+  if (tab === "gajian") {
+    const totalGajiSemua = gajianCalcResult ? gajianCalcResult.results.reduce((s, r) => {
+      const pot = parseInt(String(potonganOverride[r.driver] || 0).replace(/\D/g, ""), 10) || 0;
+      return s + r.gajiPokok + r.tunjanganHadir - pot;
+    }, 0) : 0;
+
+    return (
+      <div style={pageStyle}>
+        {toast && <Toast toast={toast} />}
+
+        {/* Detail per karyawan */}
+        {gajianDetailSel && gajianCalcResult && (() => {
+          const r = gajianCalcResult.results.find(x => x.driver === gajianDetailSel);
+          if (!r) return null;
+          const pot = parseInt(String(potonganOverride[r.driver] || "").replace(/\D/g, ""), 10) || 0;
+          const totalAkhir = r.gajiPokok + r.tunjanganHadir - pot;
+          return (
+            <Modal onClose={() => setGajianDetailSel(null)}>
+              <p style={modalTitle}>{r.driver}</p>
+              <p style={{ ...modalSub, marginBottom: 14 }}>{r.jabatan} · {monthName(gajianCalcResult.periode)}</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                <InfoRow label="Gaji pokok" val={fmt(r.gajiPokok)} />
+                <InfoRow label={`Hari kerja`} val={`${r.hariKerja} hari`} />
+                <InfoRow label="Hari absen" val={r.hariAbsen > 0 ? `${r.hariAbsen} hari` : "Tidak ada"} accent={r.hariAbsen > 0 ? "#ef4444" : undefined} />
+                <InfoRow label="Hari hadir" val={`${r.hariHadir} hari`} />
+                <InfoRow label={`Tunjangan hadir (×Rp70.000)`} val={fmt(r.tunjanganHadir)} />
+                <div style={{ height: 1, background: "#1e293b" }} />
+                <div>
+                  <p style={{ color: "#475569", fontSize: 12, marginBottom: 6 }}>POTONGAN PINJAMAN</p>
+                  <input type="text" inputMode="numeric" placeholder="0 jika tidak ada" value={potonganOverride[r.driver] || ""} onChange={e => setPotonganOverride(prev => ({ ...prev, [r.driver]: e.target.value }))} style={{ ...inputStyle, fontSize: 14 }} />
+                  {pot > 0 && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 4 }}>- {fmt(pot)}</p>}
+                </div>
+                <div style={{ height: 1, background: "#1e293b" }} />
+                <InfoRow label="Total diterima" val={fmt(totalAkhir)} bold />
+              </div>
+              <button onClick={() => setGajianDetailSel(null)} style={{ ...btnPrimary, width: "100%", justifyContent: "center" }}>Tutup</button>
+            </Modal>
+          );
+        })()}
+
+        <div style={containerStyle}>
+          <div style={{ paddingTop: 48, paddingBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}><div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e" }} /><span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>GKA Group</span></div>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>Gajian</h1>
+          </div>
+
+          {/* Form input */}
+          <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Periode</label>
+              <input type="month" value={gajianCalcForm.periode} onChange={e => { setGajianCalcForm({ ...gajianCalcForm, periode: e.target.value }); setGajianCalcResult(null); setPotonganOverride({}); }} style={inputStyle} />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Jumlah Minggu</label>
+                <input type="number" min="0" max="5" placeholder="Contoh: 4" value={gajianCalcForm.hari_minggu} onChange={e => { setGajianCalcForm({ ...gajianCalcForm, hari_minggu: e.target.value }); setGajianCalcResult(null); }} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Tanggal Merah</label>
+                <input type="number" min="0" max="10" placeholder="Contoh: 2" value={gajianCalcForm.tanggal_merah} onChange={e => { setGajianCalcForm({ ...gajianCalcForm, tanggal_merah: e.target.value }); setGajianCalcResult(null); }} style={inputStyle} />
+              </div>
+            </div>
+            {gajianCalcForm.hari_minggu !== "" && (() => {
+              const [y, m] = gajianCalcForm.periode.split("-").map(Number);
+              const total = new Date(y, m, 0).getDate();
+              const minggu = parseInt(gajianCalcForm.hari_minggu, 10) || 0;
+              const merah = parseInt(gajianCalcForm.tanggal_merah, 10) || 0;
+              const kerja = total - minggu - merah;
+              return <p style={{ color: "#64748b", fontSize: 13 }}>Total hari: {total} · Libur: {minggu + merah} · <strong style={{ color: "#34d399" }}>Hari kerja: {kerja}</strong></p>;
+            })()}
+            <button onClick={hitungGajian} style={{ ...btnPrimary, width: "100%", justifyContent: "center", padding: "14px", borderRadius: 14, fontSize: 15 }}>
+              Hitung Gaji Semua Karyawan
+            </button>
+          </div>
+
+          {/* Hasil rekap */}
+          {gajianCalcResult && (
+            <>
+              <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155", borderRadius: 20, padding: 18, marginBottom: 12 }}>
+                <p style={eyebrowStyle}>{monthName(gajianCalcResult.periode)} · {gajianCalcResult.hariKerja} hari kerja</p>
+                <p style={{ color: "#64748b", fontSize: 12, marginBottom: 4 }}>Total pengeluaran gaji</p>
+                <p style={{ color: "#f1f5f9", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>{fmt(totalGajiSemua)}</p>
+                <p style={{ color: "#475569", fontSize: 12, marginTop: 4 }}>Tap karyawan untuk input potongan pinjaman</p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {gajianCalcResult.results.map(r => {
+                  const pot = parseInt(String(potonganOverride[r.driver] || 0).replace(/\D/g, ""), 10) || 0;
+                  const totalAkhir = r.gajiPokok + r.tunjanganHadir - pot;
+                  return (
+                    <button key={r.driver} onClick={() => setGajianDetailSel(r.driver)}
+                      style={{ background: "#161b27", border: "1px solid #1e293b", borderRadius: 18, padding: 16, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontWeight: 800, fontSize: 15 }}>{r.driver[0].toUpperCase()}</div>
+                          <div>
+                            <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{r.driver}</p>
+                            <p style={{ color: "#475569", fontSize: 12 }}>{r.jabatan} · Hadir {r.hariHadir}/{r.hariKerja} hari{r.hariAbsen > 0 ? ` · ${r.hariAbsen}x absen` : ""}</p>
+                          </div>
+                        </div>
+                        <span style={{ color: "#60a5fa", fontSize: 12 }}>›</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: "#475569" }}>Tunjangan {fmt(r.tunjanganHadir)}{pot > 0 ? ` · Potong ${fmt(pot)}` : ""}</span>
+                        <span style={{ color: "#34d399", fontWeight: 800 }}>{fmt(totalAkhir)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
         <BottomNav />
       </div>
