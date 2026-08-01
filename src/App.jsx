@@ -1102,58 +1102,20 @@ export default function App() {
                 {/* Tagihan aktif */}
                 {aktifTagihans.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-                    {aktifTagihans.map(t => {
-                      const status = getTagihanStatus(t);
-                      const sc = tagihanStatusStyle(status);
-                      const sisa = getSisaTagihan(t);
-                      const bayaran = getBayaran(t.id);
-                      const progress = Math.round(((t.nominal - sisa) / t.nominal) * 100);
-                      const [open, setOpen] = useState(false);
-                      return (
-                        <div key={t.id} style={{ background: "#161b27", border: `1px solid ${status === "overdue" ? "rgba(239,68,68,0.3)" : status === "warning" ? "rgba(245,158,11,0.3)" : "#1e293b"}`, borderRadius: 18, overflow: "hidden" }}>
-                          <div style={{ padding: 16 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                              <div>
-                                <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{t.keterangan || "Tagihan"}</p>
-                                <p style={{ color: "#475569", fontSize: 12, marginTop: 2 }}>JT: {fmtDate(t.jatuh_tempo)}</p>
-                              </div>
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: `1px solid ${sc.border}`, color: sc.color, background: sc.bg }}>
-                                {tagihanStatusLabel(t)}
-                              </span>
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}>
-                              <span style={{ color: "#475569" }}>Terbayar {fmt(t.nominal - sisa)}</span>
-                              <span style={{ color: "#f59e0b", fontWeight: 700 }}>Sisa {fmt(sisa)}</span>
-                            </div>
-                            <div style={{ height: 4, background: "#0f1117", borderRadius: 99, overflow: "hidden", marginBottom: 12 }}>
-                              <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #3b82f6, #60a5fa)", borderRadius: 99 }} />
-                            </div>
-                            {/* Rincian bayaran */}
-                            {bayaran.length > 0 && (
-                              <div style={{ marginBottom: 10 }}>
-                                <button onClick={() => setOpen(!open)} style={{ background: "transparent", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
-                                  {open ? "▲" : "▼"} {bayaran.length} pembayaran
-                                </button>
-                                {open && (
-                                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                                    {bayaran.map(b => (
-                                      <div key={b.id} style={{ display: "flex", justifyContent: "space-between", background: "#0f1117", borderRadius: 8, padding: "6px 10px", fontSize: 12 }}>
-                                        <span style={{ color: "#475569" }}>{fmtDate(b.tanggal)}</span>
-                                        <span style={{ color: "#94a3b8", fontWeight: 700 }}>{fmt(b.nominal)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <button onClick={() => { setSelTagihan(t); setShowBayarForm(true); }}
-                              style={{ ...btnPrimary, width: "100%", justifyContent: "center", padding: "10px", borderRadius: 12, fontSize: 13 }}>
-                              + Catat Pembayaran
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {aktifTagihans.map(t => (
+                      <TagihanCard
+                        key={t.id}
+                        t={t}
+                        status={getTagihanStatus(t)}
+                        sisa={getSisaTagihan(t)}
+                        bayaran={getBayaran(t.id)}
+                        tagihanStatusStyle={tagihanStatusStyle}
+                        tagihanStatusLabel={tagihanStatusLabel}
+                        fmt={fmt}
+                        fmtDate={fmtDate}
+                        onBayar={(t) => { setSelTagihan(t); setShowBayarForm(true); }}
+                      />
+                    ))}
                   </div>
                 )}
 
@@ -1473,6 +1435,54 @@ function Toast({ toast }) {
   return (
     <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 100, padding: "10px 20px", borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", background: toast.type === "err" ? "#ef4444" : "#1e293b", color: "#f1f5f9", border: `1px solid ${toast.type === "err" ? "#dc2626" : "#334155"}`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", whiteSpace: "nowrap" }}>
       {toast.msg}
+    </div>
+  );
+}
+
+function TagihanCard({ t, status, sisa, bayaran, tagihanStatusStyle, tagihanStatusLabel, fmt, fmtDate, onBayar }) {
+  const [open, setOpen] = useState(false);
+  const sc = tagihanStatusStyle(status);
+  const progress = Math.round(((t.nominal - sisa) / t.nominal) * 100);
+  return (
+    <div style={{ background: "#161b27", border: `1px solid ${status === "overdue" ? "rgba(239,68,68,0.3)" : status === "warning" ? "rgba(245,158,11,0.3)" : "#1e293b"}`, borderRadius: 18, overflow: "hidden" }}>
+      <div style={{ padding: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div>
+            <p style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{t.keterangan || "Tagihan"}</p>
+            <p style={{ color: "#475569", fontSize: 12, marginTop: 2 }}>JT: {fmtDate(t.jatuh_tempo)}</p>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: `1px solid ${sc.border}`, color: sc.color, background: sc.bg }}>
+            {tagihanStatusLabel(t)}
+          </span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}>
+          <span style={{ color: "#475569" }}>Terbayar {fmt(t.nominal - sisa)}</span>
+          <span style={{ color: "#f59e0b", fontWeight: 700 }}>Sisa {fmt(sisa)}</span>
+        </div>
+        <div style={{ height: 4, background: "#0f1117", borderRadius: 99, overflow: "hidden", marginBottom: 12 }}>
+          <div style={{ height: "100%", width: `${progress}%`, background: "linear-gradient(90deg, #3b82f6, #60a5fa)", borderRadius: 99 }} />
+        </div>
+        {bayaran.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <button onClick={() => setOpen(!open)} style={{ background: "transparent", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+              {open ? "▲" : "▼"} {bayaran.length} pembayaran
+            </button>
+            {open && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                {bayaran.map(b => (
+                  <div key={b.id} style={{ display: "flex", justifyContent: "space-between", background: "#0f1117", borderRadius: 8, padding: "6px 10px", fontSize: 12 }}>
+                    <span style={{ color: "#475569" }}>{fmtDate(b.tanggal)}</span>
+                    <span style={{ color: "#94a3b8", fontWeight: 700 }}>{fmt(b.nominal)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <button onClick={() => onBayar(t)} style={{ background: "#3b82f6", border: "none", borderRadius: 12, padding: "10px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>
+          + Catat Pembayaran
+        </button>
+      </div>
     </div>
   );
 }
