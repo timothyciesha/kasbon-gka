@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import {
   DEFAULT_GAJI,
-  SUPABASE_URL,
   backBtn,
   btnPrimary,
   btnSecondary,
   cardStyle,
   containerStyle,
   eyebrowStyle,
-  headers,
   inputStyle,
   labelStyle,
   modalSub,
@@ -16,40 +14,13 @@ import {
   pageStyle,
   rowStyle,
 } from "./constants.js";
+import { db } from "./lib/db.js";
 import { createAttendanceHelpers, getNextGajian } from "./utils/attendance.js";
 import { today } from "./utils/date.js";
 import { fmt, fmtDate, fmtDateLong, monthName } from "./utils/formatters.js";
 import { createKasbonHelpers } from "./utils/kasbon.js";
 import { calculateGajian, calculateSlip } from "./utils/salary.js";
 import { createSupplierHelpers } from "./utils/supplier.js";
-
-const db = {
-  async get(table, params = "") {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { headers });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-  async post(table, body) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-      method: "POST", headers: { ...headers, "Prefer": "return=representation" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-  async patch(table, id, body) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
-      method: "PATCH", headers: { ...headers, "Prefer": "return=representation" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw await res.json();
-    return res.json();
-  },
-  async delete(table, params) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, { method: "DELETE", headers });
-    if (!res.ok) throw await res.json();
-  },
-};
 
 export default function App() {
   const [drivers, setDrivers] = useState([]);
