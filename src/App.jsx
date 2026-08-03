@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  ADMIN_FEE,
   DEFAULT_GAJI,
   SUPABASE_URL,
-  TUNJANGAN_PER_HARI,
-  WAITING_DAYS,
   backBtn,
   btnPrimary,
   btnSecondary,
@@ -19,6 +16,12 @@ import {
   pageStyle,
   rowStyle,
 } from "./constants.js";
+import { createAttendanceHelpers, getNextGajian } from "./utils/attendance.js";
+import { today } from "./utils/date.js";
+import { fmt, fmtDate, fmtDateLong, monthName } from "./utils/formatters.js";
+import { createKasbonHelpers } from "./utils/kasbon.js";
+import { calculateGajian, calculateSlip } from "./utils/salary.js";
+import { createSupplierHelpers } from "./utils/supplier.js";
 
 const db = {
   async get(table, params = "") {
@@ -47,22 +50,6 @@ const db = {
     if (!res.ok) throw await res.json();
   },
 };
-
-const fmt = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
-const fmtDate = (iso) => {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-};
-const fmtDateLong = (iso) => {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-};
-const daysSince = (iso) => {
-  if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-};
-const today = () => new Date().toISOString().slice(0, 10);
-const monthName = (iso) => new Date(iso + "-01").toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
 export default function App() {
   const [drivers, setDrivers] = useState([]);
@@ -150,28 +137,9 @@ export default function App() {
 
   useEffect(() => { fetchAll(); }, []);
 
-  // helpers
-  const getActive = (n) => kasbons.find(k => k.driver_name === n && k.is_active) || null;
-  const getHistory = (n) => kasbons.filter(k => k.driver_name === n && !k.is_active);
-  const getCicilans = (id) => cicilans.filter(c => c.kasbon_id === id);
-  const getSisaBayar = (k) => Math.max(0, k.total_potong - getCicilans(k.id).reduce((s, c) => s + c.nominal, 0));
-  const getLastLunas = (n) => { const h = getHistory(n); return h.length ? h[h.length - 1].tanggal_lunas : null; };
-  const getStatus = (n) => {
-    if (getActive(n)) return "aktif";
-    const h = getHistory(n);
-    if (!h.length) return "bersih";
-    return daysSince(getLastLunas(n)) < WAITING_DAYS ? "tunggu" : "bisa";
-  };
-  const getSisaHari = (n) => { const l = getLastLunas(n); return l ? Math.max(0, WAITING_DAYS - daysSince(l)) : 0; };
-  const getFee = (n) => { const l = getLastLunas(n); return l && daysSince(l) < WAITING_DAYS ? ADMIN_FEE : 0; };
-  const statusColor = (s) => ({
-    aktif: { color: "#fbbf24", bg: "rgba(251,191,36,0.1)", border: "rgba(251,191,36,0.2)" },
-    tunggu: { color: "#60a5fa", bg: "rgba(96,165,250,0.1)", border: "rgba(96,165,250,0.2)" },
-    bisa: { color: "#34d399", bg: "rgba(52,211,153,0.1)", border: "rgba(52,211,153,0.2)" },
-    bersih: { color: "#94a3b8", bg: "rgba(148,163,184,0.1)", border: "rgba(148,163,184,0.2)" },
-  }[s]);
-  const statusLabel = (s, n) => ({ aktif: "Ada Kasbon", tunggu: `Tunggu ${getSisaHari(n)}h`, bisa: "Bisa Kasbon", bersih: "Belum ada" }[s]);
-  const getAbsenBulan = (n, bulan) => absens.filter(a => a.driver_name === n && a.tanggal.startsWith(bulan));
+  const { getAbsenBulan } = createAttendanceHelpers(absens);
+  const { getActive, getHistory, getCicilans, getSisaBayar, getStatus, getSisaHari, getFee, statusColor, statusLabel } = createKasbonHelpers(kasbons, cicilans);
+  const { getTagihans, getBayaran, getSisaTagihan, hariSampaiJatuhTempo, getTagihanStatus, tagihanStatusStyle, tagihanStatusLabel } = createSupplierHelpers(tagihans, supplierBayar);
 
   // actions
   const addDriver = async () => {
@@ -281,18 +249,6 @@ export default function App() {
     } catch { showToast("Gagal hapus", "err"); }
   };
 
-  // hitung next gajian: 2 hari sebelum akhir bulan depan
-  const getNextGajian = (lastTanggal) => {
-    const d = new Date(lastTanggal);
-    // maju ke bulan berikutnya
-    const bulanDepan = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-    // akhir bulan depan
-    const akhirBulanDepan = new Date(bulanDepan.getFullYear(), bulanDepan.getMonth() + 1, 0);
-    // 2 hari sebelum akhir bulan
-    akhirBulanDepan.setDate(akhirBulanDepan.getDate() - 2);
-    return akhirBulanDepan.toISOString().slice(0, 10);
-  };
-
   const submitGajian = async () => {
     try {
       const [created] = await db.post("gajian", { tanggal: gajianTanggal });
@@ -313,38 +269,10 @@ export default function App() {
 
   const hitungGajian = () => {
     if (!gajianCalcForm.periode) return showToast("Pilih periode dulu", "err");
-    const [year, month] = gajianCalcForm.periode.split("-").map(Number);
-    const totalHari = new Date(year, month, 0).getDate();
-    const hariMinggu = parseInt(gajianCalcForm.hari_minggu, 10) || 0;
-    const tanggalMerah = parseInt(gajianCalcForm.tanggal_merah, 10) || 0;
-    const hariKerja = totalHari - hariMinggu - tanggalMerah;
-    if (hariKerja <= 0) return showToast("Hari kerja tidak valid", "err");
-    const results = drivers.map(d => {
-      const absenBulan = getAbsenBulan(d.name, gajianCalcForm.periode);
-      const hariAbsen = absenBulan.length;
-      const hariHadir = Math.max(0, hariKerja - hariAbsen);
-      const gajiPokok = d.gaji_pokok || DEFAULT_GAJI;
-      const tunjanganHadir = hariHadir * TUNJANGAN_PER_HARI;
-      return { driver: d.name, jabatan: d.jabatan || "Sopir", gajiPokok, hariKerja, hariAbsen, hariHadir, tunjanganHadir };
-    });
-    setGajianCalcResult({ periode: gajianCalcForm.periode, totalHari, hariMinggu, tanggalMerah, hariKerja, results });
+    const result = calculateGajian(drivers, getAbsenBulan, gajianCalcForm);
+    if (result.hariKerja <= 0) return showToast("Hari kerja tidak valid", "err");
+    setGajianCalcResult(result);
     setPotonganOverride({});
-  };
-
-  // supplier helpers
-  const getTagihans = (supId) => tagihans.filter(t => t.supplier_id === supId);
-  const getBayaran = (tagihanId) => supplierBayar.filter(b => b.tagihan_id === tagihanId);
-  const getSisaTagihan = (t) => Math.max(0, t.nominal - getBayaran(t.id).reduce((s, b) => s + b.nominal, 0));
-  const hariSampaiJatuhTempo = (tgl) => {
-    const diff = new Date(tgl).setHours(0,0,0,0) - new Date().setHours(0,0,0,0);
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-  const getTagihanStatus = (t) => {
-    if (t.is_lunas) return "lunas";
-    const h = hariSampaiJatuhTempo(t.jatuh_tempo);
-    if (h < 0) return "overdue";
-    if (h <= 3) return "warning";
-    return "aktif";
   };
 
   const addSupplier = async () => {
@@ -404,14 +332,7 @@ export default function App() {
     if (!slipDriver) return showToast("Pilih karyawan dulu", "err");
     const hari = parseInt(slipForm.hari_hadir, 10);
     if (!hari || hari < 0) return showToast("Masukkan hari hadir", "err");
-    const driverData = drivers.find(d => d.name === slipDriver);
-    const jabatan = driverData?.jabatan || "Sopir";
-    const gajiPokok = parseInt(String(slipForm.gaji_pokok).replace(/\D/g, ""), 10) || driverData?.gaji_pokok || DEFAULT_GAJI;
-    const tunjanganHadir = hari * TUNJANGAN_PER_HARI;
-    const absenBulan = getAbsenBulan(slipDriver, slipForm.periode);
-    const potonganPinjaman = parseInt(String(slipForm.potongan_pinjaman).replace(/\D/g, ""), 10) || 0;
-    const total = gajiPokok + tunjanganHadir - potonganPinjaman;
-    setSlipData({ driver: slipDriver, jabatan, periode: slipForm.periode, gajiPokok, hariHadir: hari, tunjanganHadir, absenCount: absenBulan.length, potonganPinjaman, total });
+    setSlipData(calculateSlip(slipDriver, drivers, getAbsenBulan, slipForm));
   };
 
   // ══════════════════════════════════════════════════════
@@ -977,21 +898,6 @@ export default function App() {
   // TAB: SUPPLIER
   // ══════════════════════════════════════════════════════
   if (tab === "supplier") {
-    const tagihanStatusStyle = (s) => ({
-      lunas:   { color: "#34d399", bg: "rgba(52,211,153,0.1)",  border: "rgba(52,211,153,0.2)"  },
-      aktif:   { color: "#94a3b8", bg: "rgba(148,163,184,0.1)", border: "rgba(148,163,184,0.2)" },
-      warning: { color: "#f59e0b", bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.2)"  },
-      overdue: { color: "#ef4444", bg: "rgba(239,68,68,0.1)",   border: "rgba(239,68,68,0.2)"   },
-    }[s]);
-    const tagihanStatusLabel = (t) => {
-      const s = getTagihanStatus(t);
-      const h = hariSampaiJatuhTempo(t.jatuh_tempo);
-      if (s === "lunas") return "Lunas";
-      if (s === "overdue") return `Overdue ${Math.abs(h)}h`;
-      if (s === "warning") return `H-${h} jatuh tempo`;
-      return "Aktif";
-    };
-
     // Total tagihan belum lunas semua supplier
     const totalBelumLunas = tagihans.filter(t => !t.is_lunas).reduce((s, t) => s + getSisaTagihan(t), 0);
     const totalOverdue = tagihans.filter(t => getTagihanStatus(t) === "overdue").length;
