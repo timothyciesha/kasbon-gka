@@ -103,13 +103,15 @@ export default function TabGajian({ drivers, absens, BottomNav }) {
     const hariKerja = totalHari - minggu - merah;
     if (hariKerja <= 0) return showToast("Hari kerja tidak valid", "err");
 
-    const results = drivers.map(d => {
-      const absen = getAbsenBulan(d.name, form.periode).length;
-      const hadir = Math.max(0, hariKerja - absen);
-      const gajiPokok = d.gaji_pokok || DEFAULT_GAJI;
-      const tunjangan = hadir * TUNJANGAN_PER_HARI;
-      return { driver: d.name, jabatan: d.jabatan || "Sopir", gajiPokok, hariKerja, absen, hadir, tunjangan };
-    });
+    const results = drivers
+      .filter(d => (d.jabatan || "Sopir") !== "Sopir") // sopir digaji di luar apps, tidak ikut kalkulasi gajian
+      .map(d => {
+        const absen = getAbsenBulan(d.name, form.periode).length;
+        const hadir = Math.max(0, hariKerja - absen);
+        const gajiPokok = d.gaji_pokok || DEFAULT_GAJI;
+        const tunjangan = hadir * TUNJANGAN_PER_HARI;
+        return { driver: d.name, jabatan: d.jabatan || "Sopir", gajiPokok, hariKerja, absen, hadir, tunjangan };
+      });
 
     setResult({ periode: form.periode, totalHari, minggu, merah, hariKerja, results });
     setPotongan({});
@@ -151,6 +153,7 @@ export default function TabGajian({ drivers, absens, BottomNav }) {
             return <p style={{ color: "#64748b", fontSize: 13 }}>Total: {total} hari · Libur: {total - kerja} · <strong style={{ color: "#34d399" }}>Hari kerja: {kerja}</strong></p>;
           })()}
           <button onClick={hitung} style={{ ...S.btnPrimary, width: "100%", padding: "14px", borderRadius: 14, fontSize: 15 }}>Hitung Gaji Semua Karyawan</button>
+          <p style={{ color: "#334155", fontSize: 11, textAlign: "center" }}>Sopir tidak dihitung di sini — gajian sopir di luar apps</p>
         </div>
 
         {result && (
@@ -164,6 +167,13 @@ export default function TabGajian({ drivers, absens, BottomNav }) {
               </button>
             </div>
 
+            {result.results.length === 0 && (
+              <div style={{ textAlign: "center", padding: "32px 0", color: "#334155" }}>
+                <p style={{ fontSize: 32, marginBottom: 8 }}>🚚</p>
+                <p style={{ fontSize: 14, fontWeight: 600 }}>Belum ada karyawan non-sopir</p>
+                <p style={{ fontSize: 12, marginTop: 4 }}>Sopir tidak dihitung gajinya di apps ini</p>
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {result.results.map(r => {
                 const pot = potonganVal(r.driver);
