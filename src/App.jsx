@@ -5,7 +5,6 @@ import TabKasbon from "./TabKasbon";
 import TabAbsen from "./TabAbsen";
 import TabGajian from "./TabGajian";
 import TabSupplier from "./TabSupplier";
-import TabSlip from "./TabSlip";
 
 export default function App() {
   const [tab, setTab] = useState("kasbon");
@@ -55,7 +54,6 @@ export default function App() {
     { key: "absen",    icon: "📋", label: "Absen"    },
     { key: "gajian",   icon: "💰", label: "Gajian"   },
     { key: "supplier", icon: "🏭", label: "Supplier" },
-    { key: "slip",     icon: "🧾", label: "Slip"     },
   ];
 
   const BottomNav = () => (
@@ -78,7 +76,6 @@ export default function App() {
       {tab === "absen"    && <TabAbsen    {...shared} />}
       {tab === "gajian"   && <TabGajian   {...shared} />}
       {tab === "supplier" && <TabSupplier {...shared} />}
-      {tab === "slip"     && <TabSlip     {...shared} />}
     </>
   );
 }
