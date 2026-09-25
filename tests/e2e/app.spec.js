@@ -58,6 +58,36 @@ async function fixture(page, { failure = false } = {}) {
     },
   ];
   const calls = [];
+  const user = {
+    id: "owner-user",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "timothyciesha@gmail.com",
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: {},
+    created_at: "2026-09-25T00:00:00.000Z",
+  };
+  await page.addInitScript(
+    ({ user }) => {
+      localStorage.setItem(
+        "sb-qvwohfqpkkqawemchzkk-auth-token",
+        JSON.stringify({
+          access_token: "test-access-token",
+          refresh_token: "test-refresh-token",
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          token_type: "bearer",
+          user,
+        }),
+      );
+    },
+    { user },
+  );
+  await page.route("**/auth/v1/**", async (route) => {
+    if (route.request().url().includes("/logout"))
+      return route.fulfill({ status: 204, body: "" });
+    return route.fulfill({ status: 200, json: user });
+  });
   await page.route("**/rest/v1/**", async (route) => {
     const url = new URL(route.request().url());
     const table = url.pathname.split("/").at(-1);
@@ -80,12 +110,41 @@ async function fixture(page, { failure = false } = {}) {
   ).toBeVisible();
   return { data, calls };
 }
+
+test("login owner memakai email tetap dan magic link", async ({ page }) => {
+  await page.route("**/auth/v1/**", async (route) =>
+    route.fulfill({ status: 200, json: {} }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Masuk ke GKA Operasional" }),
+  ).toBeVisible();
+  await expect(
+    page.locator('input[value="timothyciesha@gmail.com"]'),
+  ).toBeVisible();
+  const request = page.waitForRequest(
+    (req) => req.url().includes("/auth/v1/otp") && req.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Kirim link masuk" }).click();
+  expect((await request).postDataJSON()).toMatchObject({
+    email: "timothyciesha@gmail.com",
+    create_user: true,
+  });
+  await expect(page.getByRole("status")).toContainText("Cek inbox email");
+  expect(
+    await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+  ).toBe("rgb(9, 13, 12)");
+});
 test("desktop dan mobile: navigasi seluruh modul, tidak ada overflow atau error", async ({
   page,
 }) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await fixture(page);
+  await page.screenshot({
+    path: "artifacts/dashboard-dark-desktop.png",
+    fullPage: true,
+  });
   for (const name of [
     "Kasbon & karyawan",
     "Absensi",
@@ -114,7 +173,21 @@ test("desktop dan mobile: navigasi seluruh modul, tidak ada overflow atau error"
       ),
     ).toBe(true);
   }
+  await page.screenshot({
+    path: "artifacts/dashboard-dark-mobile.png",
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
+});
+
+test("logout mengakhiri sesi dan kembali ke halaman login", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.getByRole("button", { name: "Keluar" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Masuk ke GKA Operasional" }),
+  ).toBeVisible();
 });
 
 test("ekspor Excel berisi angka asli dan header rekap", async ({ page }) => {

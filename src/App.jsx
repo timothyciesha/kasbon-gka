@@ -10,8 +10,10 @@ import {
   Menu,
   X,
   ArrowUpRight,
+  LogOut,
 } from "lucide-react";
 import { useData } from "./hooks/useData.js";
+import { useAuth } from "./hooks/useAuth.js";
 import { db } from "./lib/api.js";
 import { dateLabel, today } from "./lib/domain.js";
 import { Button } from "./components/common.jsx";
@@ -21,6 +23,7 @@ import Attendance from "./pages/Attendance.jsx";
 import Payroll from "./pages/Payroll.jsx";
 import Suppliers from "./pages/Suppliers.jsx";
 import Activity from "./pages/Activity.jsx";
+import Login from "./components/Login.jsx";
 const nav = [
   {
     id: "dashboard",
@@ -47,7 +50,8 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const lock = useRef(false);
   const timer = useRef(null);
-  const { data, errors, loading, updatedAt, refresh } = useData();
+  const auth = useAuth();
+  const { data, errors, loading, updatedAt, refresh } = useData(!!auth.user);
   const navigate = (id) => {
     setTab(id);
     setMenu(false);
@@ -87,6 +91,19 @@ export default function App() {
     disabled: busy || loading || !!Object.keys(errors).length,
     navigate,
   };
+
+  if (auth.loading) {
+    return (
+      <main className="auth-loading">
+        <span className="brand-mark">G</span>
+        <RefreshCw className="spin" size={23} />
+        <p>Memeriksa sesi aman…</p>
+      </main>
+    );
+  }
+
+  if (!auth.user) return <Login sendMagicLink={auth.sendMagicLink} />;
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -134,8 +151,8 @@ export default function App() {
         <div className="sidebar-footer">
           <span className="avatar">GK</span>
           <div>
-            <strong>GKA Group</strong>
-            <small>PT Gratia Karunia Agung</small>
+            <strong>Timothy Ciesha</strong>
+            <small>{auth.user.email}</small>
           </div>
         </div>
       </aside>
@@ -172,6 +189,10 @@ export default function App() {
               <span className="refresh-label">
                 {loading ? "Memuat" : "Segarkan"}
               </span>
+            </Button>
+            <Button variant="ghost" onClick={auth.signOut}>
+              <LogOut size={16} />
+              <span className="refresh-label">Keluar</span>
             </Button>
             <span className="avatar small">GK</span>
           </div>

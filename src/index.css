@@ -1345,3 +1345,360 @@ summary {
     margin: 18mm;
   }
 }
+
+/* Dark-only application theme */
+@media screen {
+  :root {
+    color-scheme: dark;
+    color: #e8f0ed;
+    background: #090d0c;
+    --green: #35c98a;
+    --green-dark: #28a975;
+    --muted: #81918c;
+    --line: #24302d;
+    --surface: #111715;
+  }
+  body {
+    background:
+      radial-gradient(circle at 78% -20%, #17463544, transparent 35%), #090d0c;
+  }
+  h1,
+  h2,
+  h3,
+  strong {
+    color: #f2f7f5;
+  }
+  small,
+  .muted,
+  .page-title p:not(.eyebrow),
+  .panel-heading p,
+  .employee-card p,
+  .card-footer,
+  .content-footer,
+  .sync-line {
+    color: #7f918a;
+  }
+  .sidebar,
+  .topbar,
+  .bottom-nav,
+  .panel,
+  .stat,
+  .employee-card,
+  .salary-slip,
+  dialog,
+  .history-button {
+    background: #111715;
+    border-color: var(--line);
+    color: #dfe9e5;
+  }
+  .sidebar {
+    box-shadow: 16px 0 50px #0003;
+  }
+  .brand,
+  .breadcrumb strong,
+  .sidebar-footer strong,
+  td strong,
+  .employee-card h3,
+  .list-row strong,
+  .loan-summary strong {
+    color: #edf5f1;
+  }
+  .brand-mark {
+    background: linear-gradient(145deg, #39cf90, #167451);
+    color: #06110d;
+    box-shadow: 0 8px 26px #26c98322;
+  }
+  .brand-sub,
+  .workspace-label,
+  .eyebrow,
+  .breadcrumb,
+  .topbar-date {
+    color: #70817b;
+  }
+  .sidebar nav button {
+    color: #91a19b;
+  }
+  .sidebar nav button:hover,
+  .button.ghost:hover:not(:disabled),
+  .history-button:hover {
+    background: #18211e;
+  }
+  .sidebar nav button.active {
+    background: #183429;
+    color: #63d8a6;
+    box-shadow: inset 0 0 0 1px #2d654d55;
+  }
+  .nav-dot,
+  .status-dot {
+    background: #4dd49d;
+    box-shadow: 0 0 10px #4dd49d88;
+  }
+  .sidebar-note {
+    background: linear-gradient(145deg, #15201c, #101714);
+    border: 1px solid #26352f;
+  }
+  .sidebar-note p,
+  .mini-label {
+    color: #789087;
+  }
+  .avatar {
+    background: #18241f;
+    border-color: #2c3b35;
+    color: #70c69e;
+  }
+  .button.primary {
+    background: #2fbd80;
+    color: #07130e;
+    box-shadow: 0 8px 24px #2fbd801c;
+  }
+  .button.primary:hover:not(:disabled) {
+    background: #48d496;
+  }
+  .button.secondary {
+    background: #161e1b;
+    border-color: #2a3933;
+    color: #c8d7d1;
+  }
+  .button.secondary:hover:not(:disabled) {
+    background: #1d2925;
+  }
+  .button.ghost,
+  .icon-button {
+    color: #8ba099;
+  }
+  .welcome-banner {
+    background: linear-gradient(120deg, #123d2e, #0e2b22), #123d2e;
+    border: 1px solid #235640;
+    box-shadow: 0 18px 60px #0004;
+  }
+  .welcome-banner h2,
+  .welcome-banner strong {
+    color: #f4faf7;
+  }
+  .welcome-banner p,
+  .banner-date span {
+    color: #9fc6b5;
+  }
+  .stat,
+  .panel,
+  .employee-card {
+    box-shadow: 0 12px 30px #00000015;
+  }
+  .stat-heading,
+  .stat > small,
+  .field > span,
+  .inline-field,
+  td,
+  .card-footer,
+  .empty,
+  .empty h3 {
+    color: #7f928a;
+  }
+  .stat.green > strong,
+  .text-button,
+  summary {
+    color: #50d49c;
+  }
+  .panel-heading,
+  .loan-summary,
+  .list-row,
+  td,
+  .card-footer,
+  .salary-slip > header,
+  .form-actions {
+    border-color: #202c28;
+  }
+  th {
+    color: #75877f;
+    background: #0d1211;
+  }
+  input,
+  select,
+  textarea {
+    background: #0c1210;
+    border-color: #2b3934;
+    color: #e2ece8;
+  }
+  input::placeholder {
+    color: #56655f;
+  }
+  input:read-only {
+    color: #a5b6af;
+  }
+  .search {
+    background: #111715;
+    border-color: #2a3732;
+    color: #71857c;
+  }
+  .progress {
+    background: #202b27;
+  }
+  .progress span {
+    background: linear-gradient(90deg, #259f6c, #55d7a0);
+  }
+  .badge {
+    color: #9caea7;
+    background: #1b2521;
+  }
+  .badge.success {
+    background: #153627;
+    color: #72daa9;
+  }
+  .badge.warning {
+    background: #382b16;
+    color: #e8b861;
+  }
+  .badge.danger {
+    background: #3b201d;
+    color: #ec8d7d;
+  }
+  .notice,
+  .payment-preview {
+    background: #12231d;
+    border-color: #264538;
+    color: #9eb9ae;
+  }
+  .notice.error {
+    background: #321b18;
+    border-color: #653228;
+    color: #ef9a89;
+  }
+  .salary-slip .slip-total {
+    background: #153126;
+    color: #67d7a4;
+  }
+  dialog::backdrop {
+    background: #020504cc;
+  }
+  .toast {
+    background: #2fbd80;
+    color: #07130e;
+    box-shadow: 0 16px 45px #0008;
+  }
+  .toast button {
+    color: #07130e;
+  }
+  .skip-link {
+    background: #151e1b;
+    color: #f2f7f5;
+  }
+  .menu-backdrop {
+    background: #010302cc;
+  }
+  .error-dot {
+    background: #e97d6b;
+    box-shadow: 0 0 10px #e97d6b88;
+  }
+  .auth-loading,
+  .login-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 18% 12%, #1e5a4138, transparent 32%),
+      radial-gradient(circle at 88% 88%, #163d3030, transparent 34%), #080c0b;
+  }
+  .auth-loading {
+    align-content: center;
+    gap: 18px;
+    color: #789087;
+  }
+  .auth-loading p {
+    font-size: 12px;
+  }
+  .login-shell {
+    width: min(440px, 100%);
+    padding: 42px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, #141c19, #0e1412);
+    border: 1px solid #293732;
+    box-shadow: 0 30px 100px #0009;
+  }
+  .login-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: "Manrope", sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 46px;
+  }
+  .login-icon {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    color: #69daa8;
+    background: #173326;
+    border: 1px solid #28523f;
+    border-radius: 13px;
+    margin-bottom: 22px;
+  }
+  .login-shell h1 {
+    font-size: 27px;
+    margin-bottom: 13px;
+  }
+  .login-description {
+    color: #82958d;
+    font-size: 13px;
+    line-height: 1.75;
+    margin-bottom: 28px;
+  }
+  .login-shell form .button {
+    width: 100%;
+  }
+  .login-email {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 13px;
+    background: #0b110f;
+    border: 1px solid #2a3933;
+    border-radius: 8px;
+    color: #6f8d80;
+  }
+  .login-email input {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    padding-left: 0;
+  }
+  .login-sent {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 17px;
+    border: 1px solid #285541;
+    border-radius: 10px;
+    background: #132b21;
+    color: #65d6a4;
+    margin-bottom: 14px;
+  }
+  .login-sent p {
+    color: #9eb8ae;
+    font-size: 12px;
+    line-height: 1.7;
+    margin-top: 5px;
+  }
+  .login-sent b {
+    color: #dcebe5;
+  }
+  .login-security {
+    text-align: center;
+    margin-top: 24px;
+  }
+}
+
+@media screen and (max-width: 520px) {
+  .login-page {
+    padding: 15px;
+  }
+  .login-shell {
+    padding: 29px 23px;
+  }
+  .login-brand {
+    margin-bottom: 35px;
+  }
+}

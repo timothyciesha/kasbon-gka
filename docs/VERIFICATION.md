@@ -10,9 +10,11 @@
 - Supabase security advisor: tidak ada lint pada pemeriksaan setelah migrasi validasi. Ini tidak mengubah fakta bahwa aplikasi sengaja tanpa login.
 - Audit dependency produksi: 0 vulnerability yang dilaporkan npm. UUID transitif ExcelJS dipin ke 11.1.1; ekspor XLSX diuji setelah override.
 - Screenshot desktop dan mobile ditinjau secara visual. Nominal besar pada kartu mobile diperkecil agar tidak terpotong.
+- Dark theme permanen: login desktop diperiksa secara visual; tidak ada switch atau stylesheet light.
+- Auth/RLS: dry-run dan verifikasi pascamigrasi membuktikan owner dapat membaca, email lain mendapat nol baris dan tidak dapat menulis, sedangkan anon tidak memiliki grant tabel/RPC.
 
 Ekspor Excel di-load melalui dynamic import; bundle ExcelJS sekitar 930 kB sebelum gzip, terpisah dari bundle awal sekitar 201 kB. Vite memberi peringatan ukuran pada chunk ekspor ini; halaman awal tidak perlu mengunduhnya sebelum pengguna menekan Excel.
 
 ## Batas penyelesaian
 
-Migrasi additive sudah aktif pada database. Frontend baru tersedia lokal dan belum dipublikasikan. Pencabutan direct table writes (`database/cutover.sql`) harus dijalankan bersamaan dengan publikasi frontend baru. Trigger perlindungan hapus dan validasi pembayaran sudah aktif. Snapshot privat sebelum upgrade bukan backup terjadwal.
+Migrasi additive dan Auth/RLS sudah aktif pada database. Frontend baru tersedia lokal dan belum dipublikasikan. Karena akses anon sudah ditutup, versi frontend lama tidak lagi dapat mengakses database. Trigger perlindungan hapus dan validasi pembayaran tetap aktif. Snapshot privat sebelum upgrade bukan backup terjadwal.

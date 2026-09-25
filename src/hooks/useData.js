@@ -17,13 +17,14 @@ export const TABLES = [
   "audit_log",
 ];
 const empty = Object.fromEntries(TABLES.map((t) => [t, []]));
-export function useData() {
+export function useData(enabled = true) {
   const [data, setData] = useState(empty);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState(null);
   const running = useRef(null);
   const refresh = useCallback(() => {
+    if (!enabled) return Promise.resolve({});
     if (running.current) return running.current;
     setLoading(true);
     running.current = Promise.allSettled(TABLES.map((t) => db.list(t)))
@@ -44,12 +45,19 @@ export function useData() {
         running.current = null;
       });
     return running.current;
-  }, []);
+  }, [enabled]);
   useEffect(() => {
+    if (!enabled) {
+      setData(empty);
+      setErrors({});
+      setLoading(false);
+      setUpdatedAt(null);
+      return undefined;
+    }
     refresh();
     const focus = () => refresh();
     window.addEventListener("focus", focus);
     return () => window.removeEventListener("focus", focus);
-  }, [refresh]);
+  }, [enabled, refresh]);
   return { data, errors, loading, updatedAt, refresh };
 }
