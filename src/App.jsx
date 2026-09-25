@@ -1,81 +1,254 @@
-import { useState, useEffect } from "react";
-import { db } from "./db.js";
-import { S, today } from "./shared.jsx";
-import TabKasbon from "./TabKasbon";
-import TabAbsen from "./TabAbsen";
-import TabGajian from "./TabGajian";
-import TabSupplier from "./TabSupplier";
-
+import { useRef, useState } from "react";
+import {
+  Activity as ActivityIcon,
+  Building2,
+  CalendarCheck,
+  LayoutDashboard,
+  RefreshCw,
+  Wallet,
+  Banknote,
+  Menu,
+  X,
+  ArrowUpRight,
+} from "lucide-react";
+import { useData } from "./hooks/useData.js";
+import { db } from "./lib/api.js";
+import { dateLabel, today } from "./lib/domain.js";
+import { Button } from "./components/common.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Kasbon from "./pages/Kasbon.jsx";
+import Attendance from "./pages/Attendance.jsx";
+import Payroll from "./pages/Payroll.jsx";
+import Suppliers from "./pages/Suppliers.jsx";
+import Activity from "./pages/Activity.jsx";
+const nav = [
+  {
+    id: "dashboard",
+    label: "Ringkasan",
+    icon: LayoutDashboard,
+    page: Dashboard,
+  },
+  {
+    id: "kasbon",
+    label: "Kasbon & karyawan",
+    short: "Kasbon",
+    icon: Wallet,
+    page: Kasbon,
+  },
+  { id: "absen", label: "Absensi", icon: CalendarCheck, page: Attendance },
+  { id: "gajian", label: "Gajian", icon: Banknote, page: Payroll },
+  { id: "supplier", label: "Supplier", icon: Building2, page: Suppliers },
+  { id: "activity", label: "Aktivitas", icon: ActivityIcon, page: Activity },
+];
 export default function App() {
-  const [tab, setTab] = useState("kasbon");
-  const [loading, setLoading] = useState(true);
-
-  // shared state
-  const [drivers, setDrivers] = useState([]);
-  const [kasbons, setKasbons] = useState([]);
-  const [cicilans, setCicilans] = useState([]);
-  const [absens, setAbsens] = useState([]);
-  const [gajianList, setGajianList] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [tagihans, setTagihans] = useState([]);
-  const [supplierBayar, setSupplierBayar] = useState([]);
-
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [d, k, c, a, g, sup, tag, sb] = await Promise.all([
-          db.get("drivers", "order=created_at.asc"),
-          db.get("kasbons", "order=created_at.asc"),
-          db.get("cicilans", "order=created_at.asc"),
-          db.get("absens", "order=tanggal.desc"),
-          db.get("gajian", "order=tanggal.desc"),
-          db.get("suppliers", "order=name.asc"),
-          db.get("supplier_tagihan", "order=created_at.desc"),
-          db.get("supplier_bayar", "order=tanggal.asc"),
-        ]);
-        setDrivers(d); setKasbons(k); setCicilans(c); setAbsens(a);
-        setGajianList(g); setSuppliers(sup); setTagihans(tag); setSupplierBayar(sb);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    };
-    fetchAll();
-  }, []);
-
-  if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#0f1117", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, fontFamily: "'Inter', sans-serif" }}>
-      <div style={{ width: 40, height: 40, border: "3px solid #1e293b", borderTop: "3px solid #3b82f6", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <p style={{ color: "#475569", fontSize: 14 }}>Memuat data...</p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-
-  const TABS = [
-    { key: "kasbon",   icon: "💳", label: "Kasbon"   },
-    { key: "absen",    icon: "📋", label: "Absen"    },
-    { key: "gajian",   icon: "💰", label: "Gajian"   },
-    { key: "supplier", icon: "🏭", label: "Supplier" },
-  ];
-
-  const BottomNav = () => (
-    <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0f1117", borderTop: "1px solid #1e293b", display: "flex", zIndex: 30 }}>
-      {TABS.map(t => (
-        <button key={t.key} onClick={() => setTab(t.key)} style={{ flex: 1, padding: "10px 0 14px", background: "transparent", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, fontFamily: "inherit" }}>
-          <span style={{ fontSize: 18 }}>{t.icon}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, color: tab === t.key ? "#3b82f6" : "#334155" }}>{t.label}</span>
-          {tab === t.key && <div style={{ width: 16, height: 2, background: "#3b82f6", borderRadius: 99 }} />}
-        </button>
-      ))}
-    </div>
-  );
-
-  const shared = { drivers, setDrivers, kasbons, setKasbons, cicilans, setCicilans, absens, setAbsens, gajianList, setGajianList, suppliers, setSuppliers, tagihans, setTagihans, supplierBayar, setSupplierBayar, BottomNav };
-
+  const [tab, setTab] = useState("dashboard");
+  const [menu, setMenu] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+  const lock = useRef(false);
+  const timer = useRef(null);
+  const { data, errors, loading, updatedAt, refresh } = useData();
+  const navigate = (id) => {
+    setTab(id);
+    setMenu(false);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+  const command = async (action, payload, id) => {
+    if (lock.current)
+      throw new Error("Masih ada proses penyimpanan. Tunggu sebentar.");
+    if (Object.keys(errors).length || loading)
+      throw new Error("Tunggu sampai data selesai dimuat sebelum menyimpan.");
+    lock.current = true;
+    setBusy(true);
+    try {
+      const result = await db.rpc("gka_command", {
+        p_action: action,
+        p_payload: payload,
+        p_request_id: id,
+      });
+      const failures = await refresh();
+      setToast(
+        Object.keys(failures).length
+          ? "Transaksi tersimpan. Sebagian data gagal dimuat ulang; coba segarkan data."
+          : "Perubahan berhasil disimpan.",
+      );
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setToast(null), 6000);
+      return result;
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  };
+  const props = {
+    data,
+    command,
+    busy,
+    disabled: busy || loading || !!Object.keys(errors).length,
+    navigate,
+  };
   return (
-    <>
-      {tab === "kasbon"   && <TabKasbon   {...shared} />}
-      {tab === "absen"    && <TabAbsen    {...shared} />}
-      {tab === "gajian"   && <TabGajian   {...shared} />}
-      {tab === "supplier" && <TabSupplier {...shared} />}
-    </>
+    <div className="app-shell">
+      <a className="skip-link" href="#main">
+        Lewati ke konten
+      </a>
+      <aside className={`sidebar ${menu ? "is-open" : ""}`}>
+        <a
+          className="brand"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate("dashboard");
+          }}
+        >
+          <span className="brand-mark">G</span>
+          <span>
+            GKA<span className="brand-sub">OPERASIONAL</span>
+          </span>
+        </a>
+        <div className="workspace-label">WORKSPACE</div>
+        <nav aria-label="Navigasi utama">
+          {nav.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              aria-current={tab === id ? "page" : undefined}
+              className={tab === id ? "active" : ""}
+              onClick={() => navigate(id)}
+            >
+              <Icon size={19} />
+              {label}
+              {tab === id && <span className="nav-dot" />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-note">
+          <span className="mini-label">SATU RUANG KERJA</span>
+          <strong>
+            Rapi hari ini.
+            <br />
+            Siap untuk besok.
+          </strong>
+          <p>Kasbon, kehadiran, gaji, dan supplier.</p>
+          <ArrowUpRight size={22} />
+        </div>
+        <div className="sidebar-footer">
+          <span className="avatar">GK</span>
+          <div>
+            <strong>GKA Group</strong>
+            <small>PT Gratia Karunia Agung</small>
+          </div>
+        </div>
+      </aside>
+      {menu && (
+        <button
+          className="menu-backdrop"
+          aria-label="Tutup navigasi"
+          onClick={() => setMenu(false)}
+        />
+      )}
+      <div className="workspace">
+        <header className="topbar">
+          <div className="topbar-left">
+            <button
+              className="icon-button mobile-menu"
+              aria-label={menu ? "Tutup navigasi" : "Buka navigasi"}
+              onClick={() => setMenu(!menu)}
+            >
+              {menu ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <span className="breadcrumb">
+              Workspace <span>/</span>{" "}
+              <strong>{nav.find((n) => n.id === tab).label}</strong>
+            </span>
+          </div>
+          <div className="actions">
+            <span className="topbar-date">{dateLabel(today())}</span>
+            <Button
+              variant="ghost"
+              disabled={loading || busy}
+              onClick={refresh}
+            >
+              <RefreshCw size={16} className={loading ? "spin" : ""} />
+              <span className="refresh-label">
+                {loading ? "Memuat" : "Segarkan"}
+              </span>
+            </Button>
+            <span className="avatar small">GK</span>
+          </div>
+        </header>
+        <main id="main">
+          <div className="sync-line">
+            <span
+              className={`status-dot ${Object.keys(errors).length ? "error-dot" : ""}`}
+            />
+            {Object.keys(errors).length
+              ? "Sebagian data belum tersedia"
+              : loading
+                ? "Memuat data terbaru…"
+                : updatedAt
+                  ? `Diperbarui ${updatedAt.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" })} WIB`
+                  : "Menyiapkan data"}
+          </div>
+          {!!Object.keys(errors).length && (
+            <div className="notice error" role="alert">
+              <strong>
+                Data belum lengkap. Penyimpanan dinonaktifkan agar tidak memakai
+                saldo yang salah.
+              </strong>
+              <p>{Object.keys(errors).join(", ")}</p>
+              <details>
+                <summary>Detail kendala</summary>
+                {Object.entries(errors).map(([table, msg]) => (
+                  <p key={table}>
+                    {table}: {msg}
+                  </p>
+                ))}
+              </details>
+              <Button variant="secondary" disabled={loading} onClick={refresh}>
+                Coba muat ulang
+              </Button>
+            </div>
+          )}
+          {loading && !updatedAt && !Object.keys(errors).length ? (
+            <div className="loading-state">
+              <RefreshCw className="spin" size={28} />
+              <h2>Menyiapkan ruang kerja…</h2>
+              <p>Mengambil catatan yang sudah tersimpan.</p>
+            </div>
+          ) : (
+            nav.map(({ id, page: Page }) => (
+              <section key={id} hidden={id !== tab} className="page-view">
+                <Page {...props} />
+              </section>
+            ))
+          )}
+          <footer className="content-footer">
+            <span>GKA Operasional</span>
+            <span>Catatan terhubung. Riwayat terjaga.</span>
+          </footer>
+        </main>
+      </div>
+      <nav className="bottom-nav" aria-label="Navigasi seluler">
+        {nav.slice(0, 5).map(({ id, label, short, icon: Icon }) => (
+          <button
+            key={id}
+            aria-current={tab === id ? "page" : undefined}
+            onClick={() => navigate(id)}
+            className={tab === id ? "active" : ""}
+          >
+            <Icon size={19} />
+            <span>{short || label}</span>
+          </button>
+        ))}
+      </nav>
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+          <button aria-label="Tutup notifikasi" onClick={() => setToast(null)}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
