@@ -11,6 +11,7 @@ import {
   Panel,
   Stat,
 } from "../components/common.jsx";
+import BrandLogo from "../components/BrandLogo.jsx";
 import {
   dateLabel,
   downloadCSV,
@@ -33,7 +34,7 @@ function Slip({ row, period, date }) {
   return (
     <article className="salary-slip">
       <header>
-        <div className="brand-mark">G</div>
+        <BrandLogo className="slip-logo" />
         <div>
           <strong>PT Gratia Karunia Agung</strong>
           <small>SLIP GAJI · {monthLabel(period)}</small>

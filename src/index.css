@@ -4,8 +4,8 @@
   color: #182c29;
   background: #f5f7f8;
   font-synthesis: none;
-  --green: #176b53;
-  --green-dark: #164f40;
+  --green: #30356f;
+  --green-dark: #15152d;
   --muted: #657773;
   --line: #e3eae7;
   --surface: #fff;
@@ -43,7 +43,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #6bb898;
+  outline: 3px solid #7c83e8;
   outline-offset: 3px;
 }
 h1,
@@ -116,6 +116,27 @@ strong {
   font-size: 27px;
   font-weight: 800;
   border-radius: 12px 12px 12px 3px;
+}
+.brand-logo {
+  display: block;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 50%;
+  box-shadow: 0 8px 24px #09091a44;
+  background: #15152d;
+}
+.brand-name {
+  display: block;
+}
+.avatar-logo {
+  width: 38px;
+  height: 38px;
+}
+.avatar-logo.small {
+  width: 32px;
+  height: 32px;
 }
 .brand-sub {
   display: block;
@@ -363,6 +384,15 @@ main {
 .welcome-banner p {
   font-size: 12px;
   color: #bcd5c8;
+}
+.banner-logo {
+  position: absolute;
+  right: 185px;
+  width: 220px;
+  height: 220px;
+  opacity: 0.1;
+  z-index: -1;
+  box-shadow: none;
 }
 .banner-date {
   z-index: 1;
@@ -872,6 +902,15 @@ input[type="date"] {
 .salary-slip > header .badge {
   margin-left: auto;
 }
+.slip-logo {
+  width: 58px;
+  height: 58px;
+  box-shadow: none;
+}
+.loading-logo {
+  width: 76px;
+  height: 76px;
+}
 .salary-slip dl {
   margin-top: 25px;
 }
@@ -1152,6 +1191,12 @@ summary {
   .banner-date {
     display: none;
   }
+  .banner-logo {
+    right: -28px;
+    width: 210px;
+    height: 210px;
+    opacity: 0.12;
+  }
   .welcome-banner p {
     max-width: 240px;
     line-height: 1.7;
@@ -1350,23 +1395,23 @@ summary {
 @media screen {
   :root {
     color-scheme: dark;
-    color: #e8f0ed;
-    background: #090d0c;
-    --green: #35c98a;
-    --green-dark: #28a975;
-    --muted: #81918c;
-    --line: #24302d;
-    --surface: #111715;
+    color: #e9eaf5;
+    background: #090a15;
+    --green: #747bf2;
+    --green-dark: #5961d6;
+    --muted: #8b8ca8;
+    --line: #292a46;
+    --surface: #111221;
   }
   body {
     background:
-      radial-gradient(circle at 78% -20%, #17463544, transparent 35%), #090d0c;
+      radial-gradient(circle at 78% -20%, #34396b55, transparent 35%), #090a15;
   }
   h1,
   h2,
   h3,
   strong {
-    color: #f2f7f5;
+    color: #f3f3fb;
   }
   small,
   .muted,
@@ -1376,7 +1421,7 @@ summary {
   .card-footer,
   .content-footer,
   .sync-line {
-    color: #7f918a;
+    color: #898aa6;
   }
   .sidebar,
   .topbar,
@@ -1387,12 +1432,15 @@ summary {
   .salary-slip,
   dialog,
   .history-button {
-    background: #111715;
+    background: #111221;
     border-color: var(--line);
-    color: #dfe9e5;
+    color: #e1e2ef;
   }
   .sidebar {
     box-shadow: 16px 0 50px #0003;
+  }
+  .brand-logo {
+    border: 1px solid #383a69;
   }
   .brand,
   .breadcrumb strong,
@@ -1401,66 +1449,61 @@ summary {
   .employee-card h3,
   .list-row strong,
   .loan-summary strong {
-    color: #edf5f1;
-  }
-  .brand-mark {
-    background: linear-gradient(145deg, #39cf90, #167451);
-    color: #06110d;
-    box-shadow: 0 8px 26px #26c98322;
+    color: #f0f0f8;
   }
   .brand-sub,
   .workspace-label,
   .eyebrow,
   .breadcrumb,
   .topbar-date {
-    color: #70817b;
+    color: #7d7e9a;
   }
   .sidebar nav button {
-    color: #91a19b;
+    color: #999ab2;
   }
   .sidebar nav button:hover,
   .button.ghost:hover:not(:disabled),
   .history-button:hover {
-    background: #18211e;
+    background: #1a1b2e;
   }
   .sidebar nav button.active {
-    background: #183429;
-    color: #63d8a6;
-    box-shadow: inset 0 0 0 1px #2d654d55;
+    background: #202147;
+    color: #a8adff;
+    box-shadow: inset 0 0 0 1px #5961d655;
   }
   .nav-dot,
   .status-dot {
-    background: #4dd49d;
-    box-shadow: 0 0 10px #4dd49d88;
+    background: #8b91ff;
+    box-shadow: 0 0 10px #747bf299;
   }
   .sidebar-note {
-    background: linear-gradient(145deg, #15201c, #101714);
-    border: 1px solid #26352f;
+    background: linear-gradient(145deg, #191a31, #111221);
+    border: 1px solid #2c2e50;
   }
   .sidebar-note p,
   .mini-label {
-    color: #789087;
+    color: #8b8da9;
   }
   .avatar {
-    background: #18241f;
-    border-color: #2c3b35;
-    color: #70c69e;
+    background: #1b1c32;
+    border-color: #303253;
+    color: #a4a9ff;
   }
   .button.primary {
-    background: #2fbd80;
-    color: #07130e;
-    box-shadow: 0 8px 24px #2fbd801c;
+    background: #747bf2;
+    color: #080913;
+    box-shadow: 0 8px 24px #5961d633;
   }
   .button.primary:hover:not(:disabled) {
-    background: #48d496;
+    background: #8c92ff;
   }
   .button.secondary {
-    background: #161e1b;
-    border-color: #2a3933;
-    color: #c8d7d1;
+    background: #181928;
+    border-color: #30314e;
+    color: #d1d2e2;
   }
   .button.secondary:hover:not(:disabled) {
-    background: #1d2925;
+    background: #22233a;
   }
   .button.danger {
     background: #351d1a;
@@ -1473,20 +1516,20 @@ summary {
   }
   .button.ghost,
   .icon-button {
-    color: #8ba099;
+    color: #9b9cb7;
   }
   .welcome-banner {
-    background: linear-gradient(120deg, #123d2e, #0e2b22), #123d2e;
-    border: 1px solid #235640;
+    background: linear-gradient(120deg, #242653, #15152d), #15152d;
+    border: 1px solid #3b3e78;
     box-shadow: 0 18px 60px #0004;
   }
   .welcome-banner h2,
   .welcome-banner strong {
-    color: #f4faf7;
+    color: #f6f6fc;
   }
   .welcome-banner p,
   .banner-date span {
-    color: #9fc6b5;
+    color: #b8bae4;
   }
   .stat,
   .panel,
@@ -1501,12 +1544,17 @@ summary {
   .card-footer,
   .empty,
   .empty h3 {
-    color: #7f928a;
+    color: #898aa8;
+  }
+  .stat-heading svg,
+  .banner-date svg,
+  .sidebar-note > svg {
+    color: #9297ec;
   }
   .stat.green > strong,
   .text-button,
   summary {
-    color: #50d49c;
+    color: #969cff;
   }
   .panel-heading,
   .loan-summary,
@@ -1515,43 +1563,47 @@ summary {
   .card-footer,
   .salary-slip > header,
   .form-actions {
-    border-color: #202c28;
+    border-color: #252642;
   }
   th {
-    color: #75877f;
-    background: #0d1211;
+    color: #7f809c;
+    background: #0d0e1a;
   }
   input,
   select,
   textarea {
-    background: #0c1210;
-    border-color: #2b3934;
-    color: #e2ece8;
+    background: #0d0e1a;
+    border-color: #30314f;
+    color: #e5e5f1;
   }
   input::placeholder {
-    color: #56655f;
+    color: #666780;
   }
   input:read-only {
-    color: #a5b6af;
+    color: #adaec2;
   }
   .search {
-    background: #111715;
-    border-color: #2a3732;
-    color: #71857c;
+    background: #111221;
+    border-color: #2f304c;
+    color: #81829f;
   }
   .progress {
-    background: #202b27;
+    background: #252640;
   }
   .progress span {
-    background: linear-gradient(90deg, #259f6c, #55d7a0);
+    background: linear-gradient(90deg, #5961d6, #9298ff);
   }
   .badge {
-    color: #9caea7;
-    background: #1b2521;
+    color: #a6a7bc;
+    background: #1b1c2f;
   }
   .badge.success {
-    background: #153627;
-    color: #72daa9;
+    background: #22244b;
+    color: #a5aaff;
+  }
+  .badge.light {
+    color: #e1e2ff;
+    background: #ffffff12;
   }
   .badge.warning {
     background: #382b16;
@@ -1563,9 +1615,9 @@ summary {
   }
   .notice,
   .payment-preview {
-    background: #12231d;
-    border-color: #264538;
-    color: #9eb9ae;
+    background: #191a35;
+    border-color: #343667;
+    color: #afb1d4;
   }
   .notice.error {
     background: #321b18;
@@ -1573,23 +1625,26 @@ summary {
     color: #ef9a89;
   }
   .salary-slip .slip-total {
-    background: #153126;
-    color: #67d7a4;
+    background: #22244b;
+    color: #adb1ff;
+  }
+  .salary-slip footer {
+    color: #8d8fae;
   }
   dialog::backdrop {
     background: #020504cc;
   }
   .toast {
-    background: #2fbd80;
-    color: #07130e;
+    background: #747bf2;
+    color: #080913;
     box-shadow: 0 16px 45px #0008;
   }
   .toast button {
-    color: #07130e;
+    color: #080913;
   }
   .skip-link {
-    background: #151e1b;
-    color: #f2f7f5;
+    background: #191a2c;
+    color: #f3f3fb;
   }
   .menu-backdrop {
     background: #010302cc;
@@ -1606,13 +1661,13 @@ summary {
     place-items: center;
     padding: 24px;
     background:
-      radial-gradient(circle at 18% 12%, #1e5a4138, transparent 32%),
-      radial-gradient(circle at 88% 88%, #163d3030, transparent 34%), #080c0b;
+      radial-gradient(circle at 18% 12%, #363a713f, transparent 32%),
+      radial-gradient(circle at 88% 88%, #24265344, transparent 34%), #090a15;
   }
   .auth-loading {
     align-content: center;
     gap: 18px;
-    color: #789087;
+    color: #8c8da8;
   }
   .auth-loading p {
     font-size: 12px;
@@ -1621,8 +1676,8 @@ summary {
     width: min(440px, 100%);
     padding: 42px;
     border-radius: 18px;
-    background: linear-gradient(155deg, #141c19, #0e1412);
-    border: 1px solid #293732;
+    background: linear-gradient(155deg, #15162a, #10111e);
+    border: 1px solid #303152;
     box-shadow: 0 30px 100px #0009;
   }
   .login-brand {
@@ -1634,14 +1689,18 @@ summary {
     font-weight: 800;
     margin-bottom: 46px;
   }
+  .login-brand .brand-logo {
+    width: 52px;
+    height: 52px;
+  }
   .login-icon {
     width: 48px;
     height: 48px;
     display: grid;
     place-items: center;
-    color: #69daa8;
-    background: #173326;
-    border: 1px solid #28523f;
+    color: #a5aaff;
+    background: #22244b;
+    border: 1px solid #3e417d;
     border-radius: 13px;
     margin-bottom: 22px;
   }
@@ -1650,7 +1709,7 @@ summary {
     margin-bottom: 13px;
   }
   .login-description {
-    color: #82958d;
+    color: #9091ad;
     font-size: 13px;
     line-height: 1.75;
     margin-bottom: 28px;
@@ -1663,10 +1722,10 @@ summary {
     align-items: center;
     gap: 10px;
     padding-left: 13px;
-    background: #0b110f;
-    border: 1px solid #2a3933;
+    background: #0d0e1a;
+    border: 1px solid #30314f;
     border-radius: 8px;
-    color: #6f8d80;
+    color: #8586a2;
   }
   .login-email input {
     flex: 1;
@@ -1679,20 +1738,20 @@ summary {
     align-items: flex-start;
     gap: 13px;
     padding: 17px;
-    border: 1px solid #285541;
+    border: 1px solid #414583;
     border-radius: 10px;
-    background: #132b21;
-    color: #65d6a4;
+    background: #202247;
+    color: #a5aaff;
     margin-bottom: 14px;
   }
   .login-sent p {
-    color: #9eb8ae;
+    color: #b0b1d0;
     font-size: 12px;
     line-height: 1.7;
     margin-top: 5px;
   }
   .login-sent b {
-    color: #dcebe5;
+    color: #e5e5f2;
   }
   .login-security {
     text-align: center;

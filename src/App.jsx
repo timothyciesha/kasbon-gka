@@ -24,6 +24,7 @@ import Payroll from "./pages/Payroll.jsx";
 import Suppliers from "./pages/Suppliers.jsx";
 import Activity from "./pages/Activity.jsx";
 import Login from "./components/Login.jsx";
+import BrandLogo from "./components/BrandLogo.jsx";
 const nav = [
   {
     id: "dashboard",
@@ -95,7 +96,7 @@ export default function App() {
   if (auth.loading) {
     return (
       <main className="auth-loading">
-        <span className="brand-mark">G</span>
+        <BrandLogo className="loading-logo" />
         <RefreshCw className="spin" size={23} />
         <p>Memeriksa sesi aman…</p>
       </main>
@@ -118,9 +119,10 @@ export default function App() {
             navigate("dashboard");
           }}
         >
-          <span className="brand-mark">G</span>
+          <BrandLogo decorative />
           <span>
-            GKA<span className="brand-sub">OPERASIONAL</span>
+            <span className="brand-name">GKA</span>
+            <span className="brand-sub">OPERASIONAL</span>
           </span>
         </a>
         <div className="workspace-label">WORKSPACE</div>
@@ -149,7 +151,7 @@ export default function App() {
           <ArrowUpRight size={22} />
         </div>
         <div className="sidebar-footer">
-          <span className="avatar">GK</span>
+          <BrandLogo className="avatar-logo" decorative />
           <div>
             <strong>Timothy Ciesha</strong>
             <small>{auth.user.email}</small>
@@ -194,7 +196,7 @@ export default function App() {
               <LogOut size={16} />
               <span className="refresh-label">Keluar</span>
             </Button>
-            <span className="avatar small">GK</span>
+            <BrandLogo className="avatar-logo small" decorative />
           </div>
         </header>
         <main id="main">

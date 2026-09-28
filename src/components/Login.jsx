@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowRight, CheckCircle2, LockKeyhole, Mail } from "lucide-react";
 import { OWNER_EMAIL } from "../lib/supabase.js";
 import { Button } from "./common.jsx";
+import BrandLogo from "./BrandLogo.jsx";
 
 export default function Login({ sendMagicLink }) {
   const [busy, setBusy] = useState(false);
@@ -26,9 +27,10 @@ export default function Login({ sendMagicLink }) {
     <main className="login-page">
       <section className="login-shell" aria-labelledby="login-title">
         <div className="login-brand">
-          <span className="brand-mark">G</span>
+          <BrandLogo decorative />
           <span>
-            GKA<span className="brand-sub">OPERASIONAL</span>
+            <span className="brand-name">GKA</span>
+            <span className="brand-sub">OPERASIONAL</span>
           </span>
         </div>
         <div className="login-icon" aria-hidden="true">

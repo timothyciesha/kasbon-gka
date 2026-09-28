@@ -6,6 +6,7 @@ import {
   Plus,
   CalendarDays,
 } from "lucide-react";
+import BrandLogo from "../components/BrandLogo.jsx";
 import {
   Badge,
   Button,
@@ -66,6 +67,7 @@ export default function Dashboard({ data: d, navigate }) {
         </Button>
       </PageTitle>
       <div className="welcome-banner">
+        <BrandLogo className="banner-logo" decorative />
         <div>
           <Badge tone="light">GKA GROUP</Badge>
           <h2>

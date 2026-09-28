@@ -127,6 +127,11 @@ test("login owner memakai email tetap dan magic link", async ({ page }) => {
   await expect(
     page.locator('input[value="timothyciesha@gmail.com"]'),
   ).toBeVisible();
+  await expect(page.locator(".login-brand .brand-logo")).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/login-brand-blue.png",
+    fullPage: true,
+  });
   const request = page.waitForRequest(
     (req) => req.url().includes("/auth/v1/otp") && req.method() === "POST",
   );
@@ -138,7 +143,7 @@ test("login owner memakai email tetap dan magic link", async ({ page }) => {
   await expect(page.getByRole("status")).toContainText("Cek inbox email");
   expect(
     await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
-  ).toBe("rgb(9, 13, 12)");
+  ).toBe("rgb(9, 10, 21)");
 });
 test("desktop dan mobile: navigasi seluruh modul, tidak ada overflow atau error", async ({
   page,
@@ -146,6 +151,7 @@ test("desktop dan mobile: navigasi seluruh modul, tidak ada overflow atau error"
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await fixture(page);
+  await expect(page.locator(".sidebar .brand > .brand-logo")).toBeVisible();
   await page.screenshot({
     path: "artifacts/dashboard-dark-desktop.png",
     fullPage: true,
@@ -264,6 +270,11 @@ test("slip final tersedia dan layout cetak hanya menampilkan slip", async ({
   await page.locator("section:not([hidden]) input[type=month]").fill("2026-09");
   await page.getByRole("button", { name: "Lihat slip", exact: true }).click();
   await expect(page.locator(".salary-slip")).toContainText("5.650.000");
+  await expect(page.locator(".salary-slip .slip-logo")).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/salary-slip-brand-blue.png",
+    fullPage: true,
+  });
   await page.emulateMedia({ media: "print" });
   await expect(page.locator(".sidebar")).toBeHidden();
   await expect(page.locator(".salary-slip")).toBeVisible();
@@ -324,7 +335,7 @@ test("input payroll bertahan ketika pindah tab, potongan berlebih diblokir", asy
     page.getByRole("button", { name: "Finalisasi payroll", exact: true }),
   ).toBeDisabled();
 });
-test("tidak ada tombol hapus/reset, dialog dapat ditutup dengan Escape", async ({
+test("absensi tidak punya hapus/reset dan dialog dapat ditutup dengan Escape", async ({
   page,
 }) => {
   await fixture(page);
