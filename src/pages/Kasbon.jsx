@@ -7,6 +7,7 @@ import {
   Download,
   Pencil,
   Archive,
+  Trash2,
 } from "lucide-react";
 import {
   Badge,
@@ -125,6 +126,13 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
               >
                 <Archive size={15} />
                 {employee.is_active === false ? "Aktifkan" : "Nonaktifkan"}
+              </Button>
+              <Button
+                disabled={disabled || !!active}
+                variant="danger"
+                onClick={() => setModal({ type: "delete", row: employee })}
+              >
+                <Trash2 size={15} /> Hapus
               </Button>
             </div>
           </div>
@@ -375,6 +383,33 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
           <p className="notice">
             Seluruh riwayat kasbon dan gaji tetap tersimpan.
           </p>
+        </TransactionForm>
+      )}
+      {modal?.type === "delete" && (
+        <TransactionForm
+          title={`Hapus karyawan · ${modal.row.name}`}
+          fields={[
+            {
+              key: "reason",
+              label: "Alasan penghapusan",
+              hint: "Minimal 3 karakter untuk catatan audit.",
+            },
+          ]}
+          busy={busy}
+          onClose={() => setModal(null)}
+          onSubmit={async (body, id) => {
+            await save("employee_delete")(
+              { id: modal.row.id, reason: body.reason },
+              id,
+            );
+            setSelected(null);
+          }}
+        >
+          <div className="notice error">
+            Karyawan akan hilang dari aplikasi. Riwayat kasbon, absensi, dan
+            payroll tetap tersimpan. Tindakan ini hanya tersedia jika tidak ada
+            kasbon aktif.
+          </div>
         </TransactionForm>
       )}
       {modal?.type === "loan" && (

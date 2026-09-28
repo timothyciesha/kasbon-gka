@@ -1462,6 +1462,15 @@ summary {
   .button.secondary:hover:not(:disabled) {
     background: #1d2925;
   }
+  .button.danger {
+    background: #351d1a;
+    border: 1px solid #64342c;
+    color: #f09a8a;
+  }
+  .button.danger:hover:not(:disabled) {
+    background: #48231f;
+    color: #ffc0b4;
+  }
   .button.ghost,
   .icon-button {
     color: #8ba099;

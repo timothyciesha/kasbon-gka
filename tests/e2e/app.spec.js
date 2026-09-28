@@ -94,6 +94,11 @@ async function fixture(page, { failure = false } = {}) {
     if (table === "gka_command") {
       const body = route.request().postDataJSON();
       calls.push(body);
+      if (body.p_action === "employee_delete") {
+        data.drivers = data.drivers.filter(
+          (employee) => employee.id !== body.p_payload.id,
+        );
+      }
       await new Promise((resolve) => setTimeout(resolve, 200));
       return route.fulfill({ status: 200, json: { id: "result" } });
     }
@@ -188,6 +193,27 @@ test("logout mengakhiri sesi dan kembali ke halaman login", async ({
   await expect(
     page.getByRole("heading", { name: "Masuk ke GKA Operasional" }),
   ).toBeVisible();
+});
+
+test("karyawan dapat dihapus tanpa menghapus riwayat transaksi", async ({
+  page,
+}) => {
+  const { calls } = await fixture(page);
+  await page
+    .getByRole("navigation", { name: "Navigasi utama" })
+    .getByRole("button", { name: "Kasbon & karyawan" })
+    .click();
+  await page.getByRole("button", { name: /Sopir Uji/ }).click();
+  await page.getByRole("button", { name: "Hapus", exact: true }).click();
+  await page.getByLabel("Alasan penghapusan").fill("Data uji tidak dipakai");
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+
+  await expect(page.getByRole("button", { name: /Sopir Uji/ })).toHaveCount(0);
+  expect(calls.at(-1)).toMatchObject({
+    p_action: "employee_delete",
+    p_payload: { id: "e2", reason: "Data uji tidak dipakai" },
+  });
+  expect(calls.at(-1).p_request_id).toMatch(/^[0-9a-f-]{36}$/);
 });
 
 test("ekspor Excel berisi angka asli dan header rekap", async ({ page }) => {

@@ -6,6 +6,7 @@
 2. `20260925034247_strengthen_validation.sql`: kasus perubahan nama, pembatalan supplier, dan validasi pratinjau payroll.
 3. `20260925034704_supplier_reversal_guard.sql`: mengisolasi akses kolom khusus kasbon agar pembatalan supplier berjalan benar.
 4. `20260925132503_owner_email_auth.sql`: menutup seluruh akses anon, memberi read-only table grants kepada role authenticated, menerapkan RLS email owner, dan membatasi command RPC kepada `timothyciesha@gmail.com`.
+5. `20260928090000_employee_soft_delete.sql`: menyembunyikan karyawan yang dihapus dari aplikasi sambil mempertahankan seluruh riwayat transaksi dan catatan audit.
 
 Tidak ada `DROP TABLE`, `TRUNCATE`, penghapusan baris, atau reset database. Kolom bisnis lama dipertahankan. Backfill hanya mengisi kolom UUID baru dari kecocokan nama yang sudah ada.
 
