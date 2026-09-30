@@ -1,15 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  addDays,
   amount,
   csvText,
   dayDiff,
   feeFor,
+  payrollCycle,
   payrollPreview,
   remaining,
   today,
   validDate,
   workingDates,
+  workingDatesBetween,
 } from "../src/lib/domain.js";
 test("tanggal bisnis memakai WIB, termasuk batas bulan", () => {
   assert.equal(today(new Date("2026-09-25T01:00:00+07:00")), "2026-09-25");
@@ -22,6 +25,16 @@ test("hari libur yang bertepatan Minggu tidak dipotong dua kali", () => {
     26,
   );
   assert.equal(workingDates("2026-09", ["2026-09-07"]).length, 25);
+});
+test("siklus payroll dimulai sehari setelah tanggal gajian sebelumnya", () => {
+  assert.equal(addDays("2026-09-28"), "2026-09-29");
+  assert.deepEqual(
+    payrollCycle("2026-10", "2026-10-28", [
+      { periode: "2026-09", tanggal: "2026-09-28" },
+    ]),
+    { start: "2026-09-29", end: "2026-10-28" },
+  );
+  assert.equal(workingDatesBetween("2026-09-29", "2026-10-28").length, 26);
 });
 test("rupiah tidak mengubah negatif/desimal menjadi nominal positif", () => {
   for (const value of ["-100", "1.5", "1e5", "100,000", "NaN", ""])
@@ -60,7 +73,8 @@ test("payroll pakai ID karyawan, abaikan duplikat absensi, hari libur, dan void"
     absences,
     [{ id: "k", employee_id: "e", is_active: true, total_potong: 500000 }],
     [],
-    "2026-09",
+    "2026-09-01",
+    "2026-09-30",
     ["2026-09-07"],
     100000,
   );
@@ -69,7 +83,16 @@ test("payroll pakai ID karyawan, abaikan duplikat absensi, hari libur, dan void"
   assert.equal(row.tunjangan_hadir, 1680000);
   assert.equal(row.total, 5580000);
   assert.throws(() =>
-    payrollPreview(employee, absences, [], [], "2026-09", [], 1),
+    payrollPreview(
+      employee,
+      absences,
+      [],
+      [],
+      "2026-09-01",
+      "2026-09-30",
+      [],
+      1,
+    ),
   );
 });
 test("CSV mengamankan formula spreadsheet dan karakter kutip", () => {

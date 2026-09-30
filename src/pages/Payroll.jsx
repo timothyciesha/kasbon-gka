@@ -17,9 +17,10 @@ import {
   downloadCSV,
   money,
   monthLabel,
+  payrollCycle,
   payrollPreview,
   today,
-  workingDates,
+  workingDatesBetween,
 } from "../lib/domain.js";
 const exportColumns = [
   { key: "driver_name", label: "Karyawan" },
@@ -95,8 +96,15 @@ export default function Payroll({ data: d, command, busy, disabled }) {
   const run = d.payroll_runs.find((r) => r.periode === period);
   let preview = [];
   let calculationError = "";
-  if (!run)
-    try {
+  let cycle;
+  try {
+    cycle = run
+      ? {
+          start: run.period_start || `${period}-01`,
+          end: run.period_end || run.tanggal,
+        }
+      : payrollCycle(period, paymentDate, d.payroll_runs);
+    if (!run)
       preview = d.drivers
         .filter(
           (e) => e.is_active !== false && (e.jabatan || "Sopir") !== "Sopir",
@@ -107,14 +115,15 @@ export default function Payroll({ data: d, command, busy, disabled }) {
             d.absens,
             d.kasbons,
             d.cicilans,
-            period,
+            cycle.start,
+            cycle.end,
             holidays,
             cuts[e.id] || 0,
           ),
         );
-    } catch (e) {
-      calculationError = e.message;
-    }
+  } catch (e) {
+    calculationError = e.message;
+  }
   const rows = run
     ? d.payroll_items.filter((i) => i.run_id === run.id)
     : preview;
@@ -156,6 +165,7 @@ export default function Payroll({ data: d, command, busy, disabled }) {
   const changePeriod = (value) => {
     if (!value) return;
     setPeriod(value);
+    setPaymentDate(value === today().slice(0, 7) ? today() : `${value}-01`);
     setCuts({});
     setHolidays([]);
     setSlips(false);
@@ -206,10 +216,18 @@ export default function Payroll({ data: d, command, busy, disabled }) {
           {run ? "Payroll final tersimpan" : "Pratinjau · belum disimpan"}
         </Badge>
       </div>
+      {cycle && (
+        <div className="notice">
+          Siklus absensi payroll ini: <strong>{dateLabel(cycle.start)}</strong>
+          {" sampai "}
+          <strong>{dateLabel(cycle.end)}</strong>. Absensi setelah tanggal
+          pembayaran otomatis masuk ke payroll berikutnya.
+        </div>
+      )}
       {!run && (
         <Panel
           title="Pengaturan perhitungan"
-          subtitle="Hari Minggu otomatis dikecualikan. Tambahkan tanggal libur aktual agar tidak dihitung ganda."
+          subtitle="Hari Minggu otomatis dikecualikan. Tambahkan tanggal libur yang berada dalam siklus payroll."
         >
           <div className="panel-padding payroll-settings">
             <Field label="Tanggal pembayaran">
@@ -236,7 +254,9 @@ export default function Payroll({ data: d, command, busy, disabled }) {
                     aria-label="Tambah tanggal libur"
                     onClick={() => {
                       if (
-                        holiday.startsWith(period) &&
+                        cycle &&
+                        holiday >= cycle.start &&
+                        holiday <= cycle.end &&
                         !holidays.includes(holiday)
                       ) {
                         setHolidays((h) => [...h, holiday].sort());
@@ -291,7 +311,9 @@ export default function Payroll({ data: d, command, busy, disabled }) {
           value={
             run
               ? (rows[0]?.hari_kerja ?? 0)
-              : workingDates(period, holidays).length
+              : cycle
+                ? workingDatesBetween(cycle.start, cycle.end, holidays).length
+                : 0
           }
           detail="Tidak termasuk Minggu dan libur"
         />
@@ -392,7 +414,7 @@ export default function Payroll({ data: d, command, busy, disabled }) {
           <p className="muted">
             {run
               ? `Dibayar ${dateLabel(run.tanggal)} · Data final tidak berubah ketika gaji pokok diperbarui.`
-              : "Finalisasi mengunci absensi dan menyimpan slip permanen."}
+              : "Finalisasi mengunci absensi sampai tanggal pembayaran dan menyimpan slip permanen."}
           </p>
           {run ? (
             <Button variant="secondary" onClick={() => setSlips(!slips)}>
@@ -463,10 +485,16 @@ export default function Payroll({ data: d, command, busy, disabled }) {
             {monthLabel(period)} · {rows.length} karyawan · Total diterima{" "}
             <strong>{money(rows.reduce((s, r) => s + r.total, 0))}</strong>.
           </p>
+          {cycle && (
+            <p className="notice">
+              Absensi yang dihitung: {dateLabel(cycle.start)} sampai{" "}
+              {dateLabel(cycle.end)}.
+            </p>
+          )}
           <p className="notice">
             Potongan kasbon akan dicatat sebagai pembayaran. Payroll dan absensi
-            periode ini dikunci setelah berhasil. Periksa tanggal pembayaran{" "}
-            {dateLabel(paymentDate)}.
+            sampai tanggal pembayaran akan dikunci setelah berhasil. Periksa
+            tanggal pembayaran {dateLabel(paymentDate)}.
           </p>
           {error && (
             <div className="notice error" role="alert">

@@ -351,3 +351,50 @@ test("absensi tidak punya hapus/reset dan dialog dapat ditutup dengan Escape", a
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("absensi setelah tanggal gajian tetap terbuka untuk payroll berikutnya", async ({
+  page,
+}) => {
+  const { data, calls } = await fixture(page);
+  data.payroll_runs = [
+    {
+      id: "r1",
+      periode: "2026-09",
+      tanggal: "2026-09-28",
+      period_start: "2026-09-01",
+      period_end: "2026-09-28",
+      status: "final",
+    },
+  ];
+  data.attendance_periods = [
+    {
+      id: "legacy-lock",
+      periode: "2026-09",
+      reason: "Finalisasi payroll",
+      closed_at: "2026-09-28T00:00:00.000Z",
+    },
+  ];
+  await page.reload();
+  await page
+    .getByRole("navigation", { name: "Navigasi utama" })
+    .getByRole("button", { name: "Absensi", exact: true })
+    .click();
+
+  await expect(page.getByText("Terbuka sejak 29 Sep 2026")).toBeVisible();
+  await page.getByRole("button", { name: "Catat absen", exact: true }).click();
+  const date = page.getByLabel("Tanggal");
+  await expect(date).toHaveAttribute("min", "2026-09-29");
+  await expect(date).toHaveAttribute("max", "2026-09-30");
+  await page.getByRole("dialog").locator("select").first().selectOption("e1");
+  await date.fill("2026-09-30");
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+
+  expect(calls.at(-1)).toMatchObject({
+    p_action: "absence",
+    p_payload: {
+      employee_id: "e1",
+      tanggal: "2026-09-30",
+      kind: "Tidak hadir",
+    },
+  });
+});

@@ -64,6 +64,8 @@ export default function TransactionForm({
                     pattern={f.type === "money" ? "[0-9]+" : undefined}
                     value={values[f.key] ?? ""}
                     required={f.required !== false}
+                    min={f.min}
+                    max={f.max}
                     maxLength={
                       f.type === "money"
                         ? 10

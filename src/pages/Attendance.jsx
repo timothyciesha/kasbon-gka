@@ -1,6 +1,6 @@
 import ExcelButton from "../components/ExcelButton.jsx";
 import { useState } from "react";
-import { Archive, Download, Plus } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 import {
   Badge,
   Button,
@@ -9,13 +9,21 @@ import {
   Panel,
 } from "../components/common.jsx";
 import TransactionForm from "../components/TransactionForm.jsx";
-import { dateLabel, downloadCSV, monthLabel, today } from "../lib/domain.js";
+import {
+  addDays,
+  dateLabel,
+  downloadCSV,
+  monthLabel,
+  today,
+} from "../lib/domain.js";
 export default function Attendance({ data: d, command, busy, disabled }) {
   const [period, setPeriod] = useState(today().slice(0, 7));
   const [modal, setModal] = useState(null);
-  const closed = d.attendance_periods.some(
-    (p) => p.periode === period && p.closed_at,
-  );
+  const lastPayroll = d.payroll_runs
+    .slice()
+    .sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0];
+  const cutoff = lastPayroll?.tanggal;
+  const openSince = cutoff ? addDays(cutoff) : null;
   const rows = d.absens
     .filter((a) => a.tanggal.startsWith(period))
     .sort((a, b) => b.tanggal.localeCompare(a.tanggal));
@@ -25,10 +33,7 @@ export default function Attendance({ data: d, command, busy, disabled }) {
         title="Absensi karyawan"
         subtitle="Catat ketidakhadiran tanpa menghilangkan riwayat periode lama."
       >
-        <Button
-          disabled={disabled || closed}
-          onClick={() => setModal({ type: "add" })}
-        >
+        <Button disabled={disabled} onClick={() => setModal({ type: "add" })}>
           <Plus size={17} /> Catat absen
         </Button>
       </PageTitle>
@@ -42,8 +47,10 @@ export default function Attendance({ data: d, command, busy, disabled }) {
           />
         </label>
         <div className="actions">
-          <Badge tone={closed ? "neutral" : "success"}>
-            {closed ? "Periode ditutup" : "Periode terbuka"}
+          <Badge tone="success">
+            {openSince
+              ? `Terbuka sejak ${dateLabel(openSince)}`
+              : "Pencatatan terbuka"}
           </Badge>
           <ExcelButton
             name={"absensi-" + period}
@@ -73,19 +80,12 @@ export default function Attendance({ data: d, command, busy, disabled }) {
           >
             <Download size={16} /> CSV
           </Button>
-          <Button
-            disabled={disabled || closed}
-            variant="secondary"
-            onClick={() => setModal({ type: "close" })}
-          >
-            <Archive size={16} /> Tutup periode
-          </Button>
         </div>
       </div>
       <div className="notice">
-        Hari Minggu dan tanggal libur yang dipilih pada payroll tidak mengurangi
-        tunjangan lagi. Semua jenis ketidakhadiran pada hari kerja mengurangi
-        tunjangan hadir sesuai aturan saat ini.
+        {cutoff
+          ? `Payroll terakhir mengunci absensi sampai ${dateLabel(cutoff)}. Absensi setelah tanggal tersebut tetap dapat dicatat dan masuk ke payroll berikutnya.`
+          : "Belum ada payroll final. Seluruh absensi dapat dicatat sesuai tanggal kejadian."}
       </div>
       <Panel
         title={monthLabel(period)}
@@ -119,7 +119,7 @@ export default function Attendance({ data: d, command, busy, disabled }) {
                     {a.void_reason && <small>{a.void_reason}</small>}
                   </td>
                   <td>
-                    {!a.voided_at && !closed && (
+                    {!a.voided_at && (!cutoff || a.tanggal > cutoff) && (
                       <Button
                         disabled={disabled}
                         variant="ghost"
@@ -145,7 +145,7 @@ export default function Attendance({ data: d, command, busy, disabled }) {
         <TransactionForm
           title="Catat ketidakhadiran"
           initial={{
-            tanggal: period === today().slice(0, 7) ? today() : period + "-01",
+            tanggal: today(),
             kind: "Tidak hadir",
           }}
           fields={[
@@ -156,7 +156,13 @@ export default function Attendance({ data: d, command, busy, disabled }) {
                 .filter((e) => e.is_active !== false)
                 .map((e) => ({ value: e.id, label: e.name })),
             },
-            { key: "tanggal", label: "Tanggal", type: "date" },
+            {
+              key: "tanggal",
+              label: "Tanggal",
+              type: "date",
+              min: openSince || undefined,
+              max: today(),
+            },
             {
               key: "kind",
               label: "Jenis",
@@ -182,22 +188,6 @@ export default function Attendance({ data: d, command, busy, disabled }) {
             command("void_absence", { ...body, id: modal.row.id }, id)
           }
         />
-      )}
-      {modal?.type === "close" && (
-        <TransactionForm
-          title={`Tutup ${monthLabel(period)}`}
-          fields={[{ key: "reason", label: "Catatan penutupan" }]}
-          busy={busy}
-          onClose={() => setModal(null)}
-          onSubmit={(body, id) =>
-            command("close_attendance", { ...body, periode: period }, id)
-          }
-        >
-          <p className="notice">
-            Tidak ada data yang dihapus. Setelah ditutup, absensi periode ini
-            terkunci dan tetap dapat digunakan untuk payroll.
-          </p>
-        </TransactionForm>
       )}
     </>
   );

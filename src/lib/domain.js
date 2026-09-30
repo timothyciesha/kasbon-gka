@@ -34,6 +34,11 @@ export const dayDiff = (a, b) =>
   Math.round(
     (Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 86400000,
   );
+export const addDays = (value, days = 1) => {
+  const date = new Date(value + "T00:00:00Z");
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
 export function validDate(value) {
   return (
     /^\d{4}-\d{2}-\d{2}$/.test(value || "") &&
@@ -89,16 +94,44 @@ export function workingDates(period, holidays = []) {
   }
   return dates;
 }
+export function workingDatesBetween(start, end, holidays = []) {
+  if (!validDate(start) || !validDate(end) || start > end)
+    throw new Error("Rentang tanggal payroll tidak valid.");
+  const excluded = new Set(holidays);
+  const dates = [];
+  for (let value = start; value <= end; value = addDays(value)) {
+    const date = new Date(value + "T00:00:00Z");
+    if (date.getUTCDay() !== 0 && !excluded.has(value)) dates.push(value);
+  }
+  return dates;
+}
+export function payrollCycle(period, paymentDate, runs = []) {
+  if (
+    !/^\d{4}-(0[1-9]|1[0-2])$/.test(period) ||
+    !validDate(paymentDate) ||
+    !paymentDate.startsWith(period)
+  )
+    throw new Error("Tanggal pembayaran harus berada dalam periode payroll.");
+  const previous = runs
+    .filter((run) => run.tanggal < paymentDate)
+    .sort((a, b) => a.tanggal.localeCompare(b.tanggal))
+    .at(-1);
+  const start = previous ? addDays(previous.tanggal) : `${period}-01`;
+  if (start > paymentDate)
+    throw new Error("Tanggal pembayaran harus setelah payroll sebelumnya.");
+  return { start, end: paymentDate };
+}
 export function payrollPreview(
   employee,
   absences,
   loans,
   payments,
-  period,
+  start,
+  end,
   holidays,
   deduction = 0,
 ) {
-  const dates = workingDates(period, holidays);
+  const dates = workingDatesBetween(start, end, holidays);
   const absent = new Set(
     absences
       .filter(
