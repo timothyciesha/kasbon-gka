@@ -14,6 +14,7 @@ export const TABLES = [
   "payroll_runs",
   "payroll_items",
   "attendance_periods",
+  "admin_fee_withdrawals",
   "audit_log",
 ];
 const empty = Object.fromEntries(TABLES.map((t) => [t, []]));

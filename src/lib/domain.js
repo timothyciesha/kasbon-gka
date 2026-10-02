@@ -77,6 +77,25 @@ export const lastSettlement = (loans, employee) =>
     .at(-1);
 export const feeFor = (settled, date) =>
   settled && dayDiff(date, settled) < WAITING_DAYS ? ADMIN_FEE : 0;
+export function adminFeeSummary(loans, payments, withdrawals = []) {
+  const assessed = loans.reduce((sum, loan) => sum + Number(loan.fee || 0), 0);
+  const collected = loans.reduce((sum, loan) => {
+    const fee = Number(loan.fee || 0);
+    const principal = Number(loan.nominal || 0);
+    const loanPaid = paid(payments, "kasbon_id", loan.id);
+    return sum + Math.min(fee, Math.max(0, loanPaid - principal));
+  }, 0);
+  const withdrawn = withdrawals.reduce(
+    (sum, row) => sum + Number(row.amount || 0),
+    0,
+  );
+  return {
+    assessed,
+    collected,
+    withdrawn,
+    available: Math.max(0, collected - withdrawn),
+  };
+}
 export function workingDates(period, holidays = []) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period))
     throw new Error("Periode tidak valid.");

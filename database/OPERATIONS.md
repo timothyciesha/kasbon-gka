@@ -8,6 +8,7 @@
 4. `20260925132503_owner_email_auth.sql`: menutup seluruh akses anon, memberi read-only table grants kepada role authenticated, menerapkan RLS email owner, dan membatasi command RPC kepada `timothyciesha@gmail.com`.
 5. `20260928090000_employee_soft_delete.sql`: menyembunyikan karyawan yang dihapus dari aplikasi sambil mempertahankan seluruh riwayat transaksi dan catatan audit.
 6. `20260930100000_payroll_date_cutoff.sql`: mengunci absensi sampai tanggal gajian dan membawa absensi setelahnya ke siklus payroll berikutnya.
+7. `20261002100000_admin_fee_balance.sql`: mencatat pengambilan saldo biaya admin secara append-only tanpa menghapus riwayat kasbon atau pembayaran.
 
 Tidak ada `DROP TABLE`, `TRUNCATE`, penghapusan data bisnis, atau reset database. Kolom bisnis lama dipertahankan. Migrasi tanggal payroll hanya membersihkan penanda penguncian bulanan lama di `attendance_periods`; absensi, payroll, dan transaksi tetap utuh.
 

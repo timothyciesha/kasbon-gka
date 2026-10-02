@@ -14,6 +14,7 @@ const tables = [
   "payroll_runs",
   "payroll_items",
   "attendance_periods",
+  "admin_fee_withdrawals",
   "audit_log",
 ];
 async function fixture(page, { failure = false } = {}) {
@@ -98,6 +99,14 @@ async function fixture(page, { failure = false } = {}) {
         data.drivers = data.drivers.filter(
           (employee) => employee.id !== body.p_payload.id,
         );
+      }
+      if (body.p_action === "admin_fee_withdrawal") {
+        data.admin_fee_withdrawals.push({
+          id: "fee-withdrawal-1",
+          amount: 50000,
+          reason: body.p_payload.reason,
+          withdrawn_at: "2026-10-02T03:00:00.000Z",
+        });
       }
       await new Promise((resolve) => setTimeout(resolve, 200));
       return route.fulfill({ status: 200, json: { id: "result" } });
@@ -220,6 +229,51 @@ test("karyawan dapat dihapus tanpa menghapus riwayat transaksi", async ({
     p_payload: { id: "e2", reason: "Data uji tidak dipakai" },
   });
   expect(calls.at(-1).p_request_id).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("saldo biaya admin dapat diambil tanpa menghapus riwayat kasbon", async ({
+  page,
+}) => {
+  const { data, calls } = await fixture(page);
+  data.kasbons[0] = {
+    ...data.kasbons[0],
+    fee: 50000,
+    total_potong: 550000,
+    is_active: false,
+  };
+  data.cicilans = [
+    {
+      id: "c1",
+      kasbon_id: "k1",
+      nominal: 550000,
+      tanggal: "2026-09-20",
+    },
+  ];
+  await page.reload();
+  await page
+    .getByRole("navigation", { name: "Navigasi utama" })
+    .getByRole("button", { name: "Kasbon & karyawan" })
+    .click();
+
+  await expect(
+    page.locator(".stat").filter({ hasText: "Saldo biaya admin" }),
+  ).toContainText("50.000");
+  await expect(
+    page.locator(".stat").filter({ hasText: "Sudah terkumpul" }),
+  ).toContainText("50.000");
+  await page.getByRole("button", { name: "Ambil saldo" }).click();
+  await expect(page.getByRole("dialog")).toContainText("50.000");
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+
+  expect(calls.at(-1)).toMatchObject({
+    p_action: "admin_fee_withdrawal",
+    p_payload: { reason: "Pengambilan biaya admin" },
+  });
+  await expect(
+    page.locator(".stat").filter({ hasText: "Saldo biaya admin" }),
+  ).toContainText("0");
+  await expect(page.getByRole("button", { name: "Ambil saldo" })).toBeDisabled();
+  await expect(page.getByText("Pengambilan biaya admin")).toBeVisible();
 });
 
 test("ekspor Excel berisi angka asli dan header rekap", async ({ page }) => {
@@ -382,9 +436,9 @@ test("absensi setelah tanggal gajian tetap terbuka untuk payroll berikutnya", as
 
   await expect(page.getByText("Terbuka sejak 29 Sep 2026")).toBeVisible();
   await page.getByRole("button", { name: "Catat absen", exact: true }).click();
-  const date = page.getByLabel("Tanggal");
+  const date = page.getByRole("dialog").getByLabel("Tanggal", { exact: true });
   await expect(date).toHaveAttribute("min", "2026-09-29");
-  await expect(date).toHaveAttribute("max", "2026-09-30");
+  await expect(date).toHaveAttribute("max", "2026-10-02");
   await page.getByRole("dialog").locator("select").first().selectOption("e1");
   await date.fill("2026-09-30");
   await page.getByRole("button", { name: "Simpan", exact: true }).click();

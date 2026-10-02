@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addDays,
+  adminFeeSummary,
   amount,
   csvText,
   dayDiff,
@@ -57,6 +58,23 @@ test("pembayaran void tidak mengurangi saldo", () => {
       { kasbon_id: "k", nominal: 50000, voided_at: "2026-09-25" },
     ]),
     80000,
+  );
+});
+test("saldo biaya admin hanya menghitung uang setelah pokok terbayar", () => {
+  assert.deepEqual(
+    adminFeeSummary(
+      [
+        { id: "lunas", nominal: 100000, fee: 50000 },
+        { id: "aktif", nominal: 200000, fee: 50000 },
+      ],
+      [
+        { kasbon_id: "lunas", nominal: 150000 },
+        { kasbon_id: "aktif", nominal: 225000 },
+        { kasbon_id: "aktif", nominal: 50000, voided_at: "2026-10-01" },
+      ],
+      [{ amount: 30000 }],
+    ),
+    { assessed: 100000, collected: 75000, withdrawn: 30000, available: 45000 },
   );
 });
 test("payroll pakai ID karyawan, abaikan duplikat absensi, hari libur, dan void", () => {

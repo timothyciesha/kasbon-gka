@@ -8,6 +8,7 @@ import {
   Pencil,
   Archive,
   Trash2,
+  Banknote,
 } from "lucide-react";
 import {
   Badge,
@@ -20,6 +21,7 @@ import {
 } from "../components/common.jsx";
 import TransactionForm from "../components/TransactionForm.jsx";
 import {
+  adminFeeSummary,
   belongs,
   dateLabel,
   downloadCSV,
@@ -50,6 +52,14 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
     : d.kasbons;
   const active = loans.find((k) => k.is_active);
   const settlement = employee ? lastSettlement(d.kasbons, employee) : null;
+  const adminFees = adminFeeSummary(
+    d.kasbons,
+    d.cicilans,
+    d.admin_fee_withdrawals,
+  );
+  const feeWithdrawals = d.admin_fee_withdrawals
+    .slice()
+    .sort((a, b) => b.withdrawn_at.localeCompare(a.withdrawn_at));
   const employees = d.drivers.filter(
     (e) =>
       e.name.toLowerCase().includes(query.toLowerCase()) &&
@@ -100,6 +110,68 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
           </Button>
         )}
       </PageTitle>
+      {!employee && (
+        <>
+          <div className="stats-grid three">
+            <Stat
+              label="Saldo biaya admin"
+              value={money(adminFees.available)}
+              detail="Tersedia untuk diambil"
+              icon={Banknote}
+              tone="green"
+            />
+            <Stat
+              label="Sudah terkumpul"
+              value={money(adminFees.collected)}
+              detail="Setelah pokok kasbon terbayar"
+            />
+            <Stat
+              label="Total dibebankan"
+              value={money(adminFees.assessed)}
+              detail={`${d.kasbons.filter((k) => Number(k.fee || 0) > 0).length} kasbon dikenai biaya`}
+            />
+          </div>
+          <Panel
+            title="Dana biaya admin"
+            subtitle="Pengambilan dicatat sebagai riwayat; kasbon dan pembayaran lama tidak berubah."
+            action={
+              <Button
+                disabled={disabled || adminFees.available <= 0}
+                onClick={() => setModal({ type: "withdraw-admin-fee" })}
+              >
+                <Banknote size={16} /> Ambil saldo
+              </Button>
+            }
+          >
+            {feeWithdrawals.length ? (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tanggal diambil</th>
+                      <th>Catatan</th>
+                      <th className="numeric">Nominal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {feeWithdrawals.map((row) => (
+                      <tr key={row.id}>
+                        <td>{dateLabel(row.withdrawn_at)}</td>
+                        <td>{row.reason}</td>
+                        <td className="numeric">{money(row.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="panel-padding muted">
+                Belum ada pengambilan biaya admin.
+              </div>
+            )}
+          </Panel>
+        </>
+      )}
       {employee ? (
         <>
           <div className="toolbar">
@@ -467,6 +539,28 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
           <div className="notice">
             Pembayaran {money(modal.row.nominal)} akan dibatalkan dan saldo
             dihitung ulang. Catatan asli tetap tersedia.
+          </div>
+        </TransactionForm>
+      )}
+      {modal?.type === "withdraw-admin-fee" && (
+        <TransactionForm
+          title="Ambil saldo biaya admin"
+          initial={{ reason: "Pengambilan biaya admin" }}
+          fields={[
+            {
+              key: "reason",
+              label: "Catatan pengambilan",
+              hint: "Catatan ini disimpan untuk riwayat.",
+            },
+          ]}
+          busy={busy}
+          onClose={() => setModal(null)}
+          onSubmit={(body, id) => save("admin_fee_withdrawal")(body, id)}
+        >
+          <div className="notice">
+            Seluruh saldo tersedia sebesar{" "}
+            <strong>{money(adminFees.available)}</strong> akan dicatat sebagai
+            sudah diambil. Riwayat kasbon dan pembayaran tetap tersimpan.
           </div>
         </TransactionForm>
       )}
