@@ -37,8 +37,8 @@ export default function Activity({ data: d }) {
         </Button>
       </PageTitle>
       <div className="notice">
-        Aplikasi digunakan tanpa login. Riwayat ini mencatat perubahan data,
-        tetapi tidak dapat memastikan identitas orang yang melakukannya.
+        Hanya email owner yang dapat masuk dan mengubah data. Riwayat ini
+        mencatat setiap perubahan beserta data sebelum dan sesudahnya.
       </div>
       <div className="toolbar">
         <input
@@ -53,7 +53,7 @@ export default function Activity({ data: d }) {
         subtitle={`${rows.length} perubahan tercatat`}
       >
         <div className="table-wrap">
-          <table>
+          <table className="responsive">
             <thead>
               <tr>
                 <th>Waktu (WIB)</th>
@@ -66,15 +66,15 @@ export default function Activity({ data: d }) {
             <tbody>
               {rows.slice(0, limit).map((r) => (
                 <tr key={r.id}>
-                  <td>
+                  <td data-label="Waktu">
                     {new Date(r.created_at).toLocaleString("id-ID", {
                       timeZone: "Asia/Jakarta",
                     })}
                   </td>
-                  <td>{r.table_name}</td>
-                  <td>{r.action}</td>
-                  <td>{r.record_id.slice(0, 8)}</td>
-                  <td>
+                  <td data-label="Modul">{r.table_name}</td>
+                  <td data-label="Aksi">{r.action}</td>
+                  <td data-label="Referensi">{r.record_id.slice(0, 8)}</td>
+                  <td className="cell-stack">
                     <details>
                       <summary>Lihat perubahan</summary>
                       <pre>

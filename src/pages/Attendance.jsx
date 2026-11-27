@@ -92,7 +92,7 @@ export default function Attendance({ data: d, command, busy, disabled }) {
         subtitle={`${rows.filter((r) => !r.voided_at).length} catatan ketidakhadiran`}
       >
         <div className="table-wrap">
-          <table>
+          <table className="responsive">
             <thead>
               <tr>
                 <th>Karyawan</th>
@@ -106,19 +106,19 @@ export default function Attendance({ data: d, command, busy, disabled }) {
             <tbody>
               {rows.map((a) => (
                 <tr key={a.id}>
-                  <td>
+                  <td className="cell-title">
                     <strong>{a.driver_name}</strong>
                   </td>
-                  <td>{dateLabel(a.tanggal)}</td>
-                  <td>{a.kind || "Tidak hadir"}</td>
-                  <td>{a.note || "—"}</td>
-                  <td>
+                  <td data-label="Tanggal">{dateLabel(a.tanggal)}</td>
+                  <td data-label="Jenis">{a.kind || "Tidak hadir"}</td>
+                  <td data-label="Catatan">{a.note || "—"}</td>
+                  <td data-label="Status">
                     <Badge tone={a.voided_at ? "danger" : "neutral"}>
                       {a.voided_at ? "Dibatalkan" : "Tercatat"}
                     </Badge>
                     {a.void_reason && <small>{a.void_reason}</small>}
                   </td>
-                  <td>
+                  <td className="cell-action">
                     {!a.voided_at && (!cutoff || a.tanggal > cutoff) && (
                       <Button
                         disabled={disabled}

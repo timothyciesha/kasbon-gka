@@ -27,6 +27,10 @@ export default function TransactionForm({
         if (f.type === "date" && !validDate(body[f.key]))
           throw new Error(`${f.label} tidak valid.`);
       }
+      if (balance !== undefined && Number(body.nominal) > balance)
+        throw new Error(
+          `Pembayaran melebihi sisa saldo ${money(balance)}. Periksa kembali nominalnya.`,
+        );
       await onSubmit(body, requestId.current);
       onClose();
     } catch (err) {
@@ -38,7 +42,17 @@ export default function TransactionForm({
       <form onSubmit={submit}>
         <fieldset disabled={busy}>
           {fields.map((f) => (
-            <Field key={f.key} label={f.label} hint={f.hint}>
+            <Field
+              key={f.key}
+              label={f.label}
+              hint={
+                f.type === "money" &&
+                values[f.key] !== "" &&
+                values[f.key] != null
+                  ? [money(values[f.key]), f.hint].filter(Boolean).join(" · ")
+                  : f.hint
+              }
+            >
               {(id) =>
                 f.options ? (
                   <select
@@ -62,20 +76,27 @@ export default function TransactionForm({
                     type={f.type === "money" ? "text" : f.type || "text"}
                     inputMode={f.type === "money" ? "numeric" : undefined}
                     pattern={f.type === "money" ? "[0-9]+" : undefined}
+                    autoComplete="off"
                     value={values[f.key] ?? ""}
                     required={f.required !== false}
                     min={f.min}
                     max={f.max}
                     maxLength={
                       f.type === "money"
-                        ? 10
+                        ? 16
                         : f.type === "text"
                           ? 200
                           : undefined
                     }
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, [f.key]: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      // Accept "50.000" or "Rp 50.000" typed/pasted on a phone
+                      // keyboard and keep only the rupiah digits.
+                      const value =
+                        f.type === "money"
+                          ? e.target.value.replace(/\D/g, "")
+                          : e.target.value;
+                      setValues((v) => ({ ...v, [f.key]: value }));
+                    }}
                   />
                 )
               }

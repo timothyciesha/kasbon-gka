@@ -272,7 +272,9 @@ test("saldo biaya admin dapat diambil tanpa menghapus riwayat kasbon", async ({
   await expect(
     page.locator(".stat").filter({ hasText: "Saldo biaya admin" }),
   ).toContainText("0");
-  await expect(page.getByRole("button", { name: "Ambil saldo" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Ambil saldo" }),
+  ).toBeDisabled();
   await expect(page.getByText("Pengambilan biaya admin")).toBeVisible();
 });
 
@@ -438,7 +440,10 @@ test("absensi setelah tanggal gajian tetap terbuka untuk payroll berikutnya", as
   await page.getByRole("button", { name: "Catat absen", exact: true }).click();
   const date = page.getByRole("dialog").getByLabel("Tanggal", { exact: true });
   await expect(date).toHaveAttribute("min", "2026-09-29");
-  await expect(date).toHaveAttribute("max", "2026-10-02");
+  const wibToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
+  await expect(date).toHaveAttribute("max", wibToday);
   await page.getByRole("dialog").locator("select").first().selectOption("e1");
   await date.fill("2026-09-30");
   await page.getByRole("button", { name: "Simpan", exact: true }).click();

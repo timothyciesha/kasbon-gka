@@ -17,7 +17,7 @@ export async function downloadExcel(name, columns, rows) {
   sheet.getRow(1).fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FF176B53" },
+    fgColor: { argb: "FF30356F" },
   };
   sheet.views = [{ state: "frozen", ySplit: 1 }];
   sheet.autoFilter = { from: "A1", to: { row: 1, column: columns.length } };

@@ -328,7 +328,7 @@ export default function Payroll({ data: d, command, busy, disabled }) {
         subtitle="Sopir digaji di luar aplikasi. Tunjangan kehadiran Rp70.000 per hari kerja."
       >
         <div className="table-wrap">
-          <table>
+          <table className="responsive">
             <thead>
               <tr>
                 <th>Karyawan</th>
@@ -357,23 +357,23 @@ export default function Payroll({ data: d, command, busy, disabled }) {
                     )
               ).map((r) => (
                 <tr key={r.employee_id}>
-                  <td>
+                  <td className="cell-title">
                     <strong>{r.driver_name}</strong>
                   </td>
-                  <td>
+                  <td data-label="Hadir">
                     {r.hari_kerja !== undefined
                       ? `${r.hari_kerja - r.hari_absen}/${r.hari_kerja}`
                       : "—"}
                   </td>
-                  <td className="numeric">
+                  <td className="numeric" data-label="Pokok">
                     {r.gaji_pokok !== undefined ? money(r.gaji_pokok) : "—"}
                   </td>
-                  <td className="numeric">
+                  <td className="numeric" data-label="Tunjangan">
                     {r.tunjangan_hadir !== undefined
                       ? money(r.tunjangan_hadir)
                       : "—"}
                   </td>
-                  <td className="numeric">
+                  <td className="numeric" data-label="Potongan kasbon">
                     {run ? (
                       money(r.potongan_pinjaman)
                     ) : (
@@ -382,12 +382,16 @@ export default function Payroll({ data: d, command, busy, disabled }) {
                           className="deduction-input"
                           aria-label={`Potongan ${r.driver_name}`}
                           inputMode="numeric"
+                          autoComplete="off"
                           value={cuts[r.employee_id] || ""}
                           placeholder="0"
                           onChange={(e) =>
                             setCuts((c) => ({
                               ...c,
-                              [r.employee_id]: e.target.value,
+                              [r.employee_id]: e.target.value.replace(
+                                /\D/g,
+                                "",
+                              ),
                             }))
                           }
                         />
@@ -397,7 +401,7 @@ export default function Payroll({ data: d, command, busy, disabled }) {
                       </>
                     )}
                   </td>
-                  <td className="numeric">
+                  <td className="numeric cell-total" data-label="Diterima">
                     <strong>
                       {r.total !== undefined ? money(r.total) : "—"}
                     </strong>

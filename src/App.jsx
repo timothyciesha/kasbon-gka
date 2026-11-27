@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity as ActivityIcon,
   Building2,
@@ -42,7 +42,12 @@ const nav = [
   { id: "absen", label: "Absensi", icon: CalendarCheck, page: Attendance },
   { id: "gajian", label: "Gajian", icon: Banknote, page: Payroll },
   { id: "supplier", label: "Supplier", icon: Building2, page: Suppliers },
-  { id: "activity", label: "Aktivitas", icon: ActivityIcon, page: Activity },
+  {
+    id: "activity",
+    label: "Aktivitas",
+    icon: ActivityIcon,
+    page: Activity,
+  },
 ];
 export default function App() {
   const [tab, setTab] = useState("dashboard");
@@ -58,6 +63,29 @@ export default function App() {
     setMenu(false);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
+  const showToast = (message) => {
+    setToast(message);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setToast(null), 6000);
+  };
+  const signOut = async () => {
+    try {
+      await auth.signOut();
+    } catch (err) {
+      showToast(err.message || "Gagal keluar. Silakan coba lagi.");
+    }
+  };
+  useEffect(() => {
+    if (!menu) return undefined;
+    const close = (e) => e.key === "Escape" && setMenu(false);
+    document.addEventListener("keydown", close);
+    document.body.classList.add("menu-open");
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.body.classList.remove("menu-open");
+    };
+  }, [menu]);
+  useEffect(() => () => clearTimeout(timer.current), []);
   const command = async (action, payload, id) => {
     if (lock.current)
       throw new Error("Masih ada proses penyimpanan. Tunggu sebentar.");
@@ -71,14 +99,12 @@ export default function App() {
         p_payload: payload,
         p_request_id: id,
       });
-      const failures = await refresh();
-      setToast(
+      const failures = await refresh({ force: true });
+      showToast(
         Object.keys(failures).length
           ? "Transaksi tersimpan. Sebagian data gagal dimuat ulang; coba segarkan data."
           : "Perubahan berhasil disimpan.",
       );
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => setToast(null), 6000);
       return result;
     } finally {
       lock.current = false;
@@ -185,14 +211,15 @@ export default function App() {
             <Button
               variant="ghost"
               disabled={loading || busy}
-              onClick={refresh}
+              onClick={() => refresh()}
+              aria-label="Segarkan data"
             >
               <RefreshCw size={16} className={loading ? "spin" : ""} />
               <span className="refresh-label">
                 {loading ? "Memuat" : "Segarkan"}
               </span>
             </Button>
-            <Button variant="ghost" onClick={auth.signOut}>
+            <Button variant="ghost" onClick={signOut} aria-label="Keluar">
               <LogOut size={16} />
               <span className="refresh-label">Keluar</span>
             </Button>
@@ -227,7 +254,11 @@ export default function App() {
                   </p>
                 ))}
               </details>
-              <Button variant="secondary" disabled={loading} onClick={refresh}>
+              <Button
+                variant="secondary"
+                disabled={loading}
+                onClick={() => refresh()}
+              >
                 Coba muat ulang
               </Button>
             </div>
@@ -252,7 +283,7 @@ export default function App() {
         </main>
       </div>
       <nav className="bottom-nav" aria-label="Navigasi seluler">
-        {nav.slice(0, 5).map(({ id, label, short, icon: Icon }) => (
+        {nav.map(({ id, label, short, icon: Icon }) => (
           <button
             key={id}
             aria-current={tab === id ? "page" : undefined}

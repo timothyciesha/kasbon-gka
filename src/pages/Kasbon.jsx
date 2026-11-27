@@ -145,7 +145,7 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
           >
             {feeWithdrawals.length ? (
               <div className="table-wrap">
-                <table>
+                <table className="responsive">
                   <thead>
                     <tr>
                       <th>Tanggal diambil</th>
@@ -156,9 +156,13 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
                   <tbody>
                     {feeWithdrawals.map((row) => (
                       <tr key={row.id}>
-                        <td>{dateLabel(row.withdrawn_at)}</td>
-                        <td>{row.reason}</td>
-                        <td className="numeric">{money(row.amount)}</td>
+                        <td data-label="Tanggal">
+                          {dateLabel(row.withdrawn_at)}
+                        </td>
+                        <td data-label="Catatan">{row.reason}</td>
+                        <td className="numeric" data-label="Nominal">
+                          {money(row.amount)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -175,7 +179,13 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
       {employee ? (
         <>
           <div className="toolbar">
-            <Button variant="ghost" onClick={() => setSelected(null)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelected(null);
+                window.scrollTo({ top: 0, behavior: "instant" });
+              }}
+            >
               <ArrowLeft size={16} /> Semua karyawan
             </Button>
             <div className="actions">
@@ -285,7 +295,7 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
                   />
                 </div>
                 <div className="table-wrap">
-                  <table>
+                  <table className="responsive">
                     <thead>
                       <tr>
                         <th>Tanggal</th>
@@ -298,22 +308,24 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
                     <tbody>
                       {payments.map((c) => (
                         <tr key={c.id}>
-                          <td>{dateLabel(c.tanggal)}</td>
-                          <td>
+                          <td data-label="Tanggal">{dateLabel(c.tanggal)}</td>
+                          <td data-label="Catatan">
                             {c.note ||
                               (c.payroll_run_id
                                 ? "Potongan payroll"
                                 : "Pembayaran kasbon")}
                             <small>{c.id.slice(0, 8)}</small>
                           </td>
-                          <td>
+                          <td data-label="Status">
                             <Badge tone={c.voided_at ? "danger" : "success"}>
                               {c.voided_at ? "Dibatalkan" : "Tercatat"}
                             </Badge>
                             {c.void_reason && <small>{c.void_reason}</small>}
                           </td>
-                          <td className="numeric">{money(c.nominal)}</td>
-                          <td>
+                          <td className="numeric" data-label="Nominal">
+                            {money(c.nominal)}
+                          </td>
+                          <td className="cell-action">
                             {!c.voided_at && !c.payroll_run_id && (
                               <Button
                                 disabled={disabled}
@@ -368,7 +380,10 @@ export default function Kasbon({ data: d, command, busy, disabled }) {
                 <button
                   className="employee-card"
                   key={e.id}
-                  onClick={() => setSelected(e.id)}
+                  onClick={() => {
+                    setSelected(e.id);
+                    window.scrollTo({ top: 0, behavior: "instant" });
+                  }}
                 >
                   <div className="row-between">
                     <span className="avatar large">

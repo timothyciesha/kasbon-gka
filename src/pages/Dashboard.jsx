@@ -207,7 +207,7 @@ export default function Dashboard({ data: d, navigate }) {
         subtitle="Kasbon dan supplier terbaru"
       >
         <div className="table-wrap">
-          <table>
+          <table className="responsive">
             <thead>
               <tr>
                 <th>Transaksi</th>
@@ -220,17 +220,19 @@ export default function Dashboard({ data: d, navigate }) {
             <tbody>
               {recent.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.kind}</td>
-                  <td>
+                  <td data-label="Transaksi">{r.kind}</td>
+                  <td data-label="Nama">
                     <strong>{r.name || "—"}</strong>
                   </td>
-                  <td>{dateLabel(r.tanggal)}</td>
-                  <td>
+                  <td data-label="Tanggal">{dateLabel(r.tanggal)}</td>
+                  <td data-label="Status">
                     <Badge tone={r.voided_at ? "danger" : "success"}>
                       {r.voided_at ? "Dibatalkan" : "Tercatat"}
                     </Badge>
                   </td>
-                  <td className="numeric">{money(r.nominal)}</td>
+                  <td className="numeric" data-label="Nominal">
+                    {money(r.nominal)}
+                  </td>
                 </tr>
               ))}
             </tbody>

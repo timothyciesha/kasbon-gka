@@ -109,6 +109,7 @@ export default function Suppliers({ data: d, command, busy, disabled }) {
           columns={[
             { key: "supplier", label: "Supplier" },
             { key: "keterangan", label: "Tagihan" },
+            { key: "jatuh_tempo", label: "Jatuh tempo" },
             { key: "nominal", label: "Nominal" },
             { key: "sisa", label: "Sisa" },
           ]}
@@ -201,7 +202,7 @@ export default function Suppliers({ data: d, command, busy, disabled }) {
             </div>
             {expanded === t.id && (
               <div className="table-wrap">
-                <table>
+                <table className="responsive">
                   <thead>
                     <tr>
                       <th>Tanggal</th>
@@ -214,19 +215,21 @@ export default function Suppliers({ data: d, command, busy, disabled }) {
                   <tbody>
                     {payments.map((b) => (
                       <tr key={b.id}>
-                        <td>{dateLabel(b.tanggal)}</td>
-                        <td>
+                        <td data-label="Tanggal">{dateLabel(b.tanggal)}</td>
+                        <td data-label="Catatan">
                           {b.note || "—"}
                           <small>{b.id.slice(0, 8)}</small>
                         </td>
-                        <td className="numeric">{money(b.nominal)}</td>
-                        <td>
+                        <td className="numeric" data-label="Nominal">
+                          {money(b.nominal)}
+                        </td>
+                        <td data-label="Status">
                           <Badge tone={b.voided_at ? "danger" : "success"}>
                             {b.voided_at ? "Dibatalkan" : "Tercatat"}
                           </Badge>
                           {b.void_reason && <small>{b.void_reason}</small>}
                         </td>
-                        <td>
+                        <td className="cell-action">
                           {!b.voided_at && (
                             <Button
                               disabled={disabled}
